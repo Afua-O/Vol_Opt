@@ -1,7 +1,7 @@
 """
 Created on Wed Nov 24 13:28:27 2021
 
-@author: aow001
+@author: aow001 based on https://github.com/JazminZatarain/MUSEH2O/blob/main/susquehanna_model.py
 """
 #Lower Volta River model
 
