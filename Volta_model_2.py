@@ -129,11 +129,11 @@ class VoltaModel:
             create_path("./Data/Historical_data/Inflow(cfs)_to_Akosombo_1981-2013.txt"),
             self.n_years, self.n_days_one_year
             )  # inflow, i.e. flows to Akosombo   (cfs) 1981-2013     
-        self.tailwater = utils.loadMultivector(
+        self.tailwater = utils.loadMultiVector(
             create_path("./Data/Historical_data/3.Tailwater/tailwater_Ak.txt"), 
             self.n_years, self.n_days_one_year
             ) # historical tailwater level @ Akosombo (ft) 1981-2013
-        self.fh_Kpong = utils.loadMultivector(create_path(
+        self.fh_Kpong = utils.loadMultiVector(create_path(
             "./Data/Historical_data/1.Fixed_head/fh_Kpong.txt"),
             self.n_years, self.n_days_one_year
             ) # historical fixed head Kpong (ft) 1984-2012
