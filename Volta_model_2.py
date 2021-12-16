@@ -104,9 +104,9 @@ class VoltaModel:
         self.daily_power = 6
         # minimum (firm) daily power requirement (GWh)
         self.annual_irri = 1342
-        # annual irrigation demand (cfs) (=38m3/s)
+        # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
         self.inundated_area = 81224 
-        # monthly flowrate above which flooding occurs (cfs) (=2300m3/s) for objective that limits all flooding
+        # monthly flowrate above which flooding occurs (cfs) (=2300m3/s rounded up) for objective that limits all flooding
         self.flood_protection = 276
         # reservoir level above which spilling is triggered. For objective that limits area of inundation during flooding
         self.clam_eflows = 330 #placeholder, to be corrected actually a range from Nov to March (50 to 330m3/s)
