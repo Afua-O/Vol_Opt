@@ -521,8 +521,8 @@ class VoltaModel:
     
     #Minimization function of the difference between the p1 and pTarget (for annual hydropower)
     def g_hydro_rel(self, p1, pTarget):       
-        pTarget = np.tile(pTarget, int(len(p1))       
-        g = (p1 - pTarget)    #whats wrong here
+        pTarget = np.tile(pTarget, int(len(p1)))      
+        g = (p1 - pTarget)    
         G = np.mean(np.square(g))
         return G
 
