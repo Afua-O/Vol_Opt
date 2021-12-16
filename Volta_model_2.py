@@ -103,9 +103,9 @@ class VoltaModel:
         # annual hydropower requirement (GWh)
         self.daily_power = 6
         # minimum (firm) daily power requirement (GWh)
-        self.annual_irri = 1341.95734
+        self.annual_irri = 1342
         # annual irrigation demand (cfs) (=38m3/s)
-        self.inundated_area = 81223.7335 
+        self.inundated_area = 81224 
         # monthly flowrate above which flooding occurs (cfs) (=2300m3/s) for objective that limits all flooding
         self.flood_protection = 276
         # reservoir level above which spilling is triggered. For objective that limits area of inundation during flooding
