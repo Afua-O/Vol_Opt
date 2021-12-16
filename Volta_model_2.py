@@ -80,7 +80,7 @@ class VoltaModel:
             create_path("./Data/Akosombo_xtics/2.Turbines/turbines_Ak.txt"), 3, 1
             )  # Max capacity (cfs) - min capacity (cfs) - efficiency of Akosombo plant turbines
         self.spillways = utils.loadMatrix(
-            create_path(".Data/Akosombo_xtics/4.Spillways/spillways_Ak.txt"), 3, 1
+            create_path("./Data/Akosombo_xtics/4.Spillways/spillways_Ak.txt"), 3, 1
             ) #level (ft) - max release (cfs) - min release (cfs) for level  276 ft (should this be 236?***)
                 
         #Kpong Characteristics
