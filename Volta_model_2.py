@@ -85,7 +85,7 @@ class VoltaModel:
                 
         #Kpong Characteristics
         self.turbines_Kp = utils.loadMatrix(
-            create_path("./Kpong xtics/turbines_Kp.txt"), 2, 1 
+            create_path("./Data/Kpong_xtics/2.Turbine/turbines_Kp.txt"), 2, 1 
             ) # Turbine capacity (cfs) - efficiency of Kpong
         
         
@@ -128,7 +128,7 @@ class VoltaModel:
         self.inflow_Ak = utils.loadMultiVector(
             create_path("./Data/Historical_data/Inflow(cfs)_to_Akosombo_1981-2013.txt"),
             self.n_years, self.n_days_one_year
-        )  # inflow, i.e. flows to Akosombo   (cfs) 1981-2013     
+            )  # inflow, i.e. flows to Akosombo   (cfs) 1981-2013     
         self.tailwater = utils.loadMultivector(
             create_path("./Data/Historical_data/3.Tailwater/tailwater_Ak.txt"), 
             self.n_years, self.n_days_one_year
