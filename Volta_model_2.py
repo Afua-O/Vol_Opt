@@ -1,6 +1,6 @@
 """
 Created on Wed Nov 24 13:28:27 2021
-checking if this updates in downloaded folder
+
 @author: aow001
 """
 #Lower Volta River model
