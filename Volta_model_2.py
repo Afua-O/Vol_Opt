@@ -23,7 +23,7 @@ def create_path(rest):
 class VoltaModel:
     gammaH20 = 1000.0 #density of water- 1000 kg/m3
     GG = 9.81 #acceleration due to gravity- 9.81 m/s2
-    n_days_in_year = 365 #days in a year                                        #(leap year??***)
+    n_days_in_year = 365 #days in a year                                         #(leap year??***)
     
     #initial conditions
     def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=True):
@@ -31,15 +31,12 @@ class VoltaModel:
 
         Parameters
         ----------
-        l0_Akosombo : float
-                     initial condition (water level) at Akosombo
-        d0 : int
-             initial start date 
+        l0_Akosombo : float; initial condition (water level) at Akosombo
+        d0 : int; initial start date 
         n_years : int
         rbf : callable
-        historic_data : bool, optional
-                        if true use historic data, if false use stochastic
-                        data
+        historic_data : bool, optional; if true use historic data, 
+                        if false use stochastic data
         """
 
         self.init_level = l0_Akosombo  # historical average water level_feet
@@ -47,13 +44,13 @@ class VoltaModel:
         
         self.log_level_release = False                                         #(there's a FIXME here in the Sasquehana***)
         
-        # variables from the header file (#not sure what this is but it's necessary***)
+        # variables from the header file 
         self.input_min = []
         self.input_max = []
         self.output_max = []
         self.rbf = rbf
         
-        # log level / release                                   #***add rarea for inundated area ?
+        # log level / release                                   
         self.blevel_Ak = [] # water level at Akosombo
         self.rirri = []     # water released for irrigation
         self.rflood = []    # flood release- excess water above 276ft @ Akosombo 
@@ -98,24 +95,23 @@ class VoltaModel:
             self.evaluate = self.evaluate_mc
            
            
-        #Objective parameters  
+        #Objective parameters  (#to be replaced with daily timeseries for a year)
         self.annual_power = 4415
-        # annual hydropower requirement (GWh)
+        # annual hydropower target (GWh)
         self.daily_power = 6
         # minimum (firm) daily power requirement (GWh)
         self.annual_irri = 1342
         # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
-        self.inundated_area = 81224
-        # monthly flowrate above which flooding occurs (cfs) (=2300m3/s rounded) for objective that limits all flooding
         self.flood_protection = 276
-        # reservoir level above which spilling is triggered. For objective that limits area of inundation during flooding
-        self.clam_eflows_l = 50 #placeholder, to be corrected actually a range from Nov to March (50 to 330m3/s)
-        # low flows required in November to March (m3/s)
+        # reservoir level above which spilling is triggered. 
+        self.clam_eflows_l = 50 
+        # lower bound of of e-flow required in November to March (m3/s)
         self.clam_eflows_u = 330
+        # upper bound of of e-flow required in November to March (m3/s)
         
-        # standardization of the input-output of the RBF release curve      (#***not clear)
+        # standardization of the input-output of the RBF release curve      (#***not clear so not sure what the Lower Volta equivalent for the 120 is)
         self.input_max.append(self.n_days_in_year * self.decisions_per_day - 1) 
-        self.input_max.append(120)                                              #not sure what this is*** 
+        self.input_max.append(120)                                              
         
         self.output_max.append(utils.computeMax(self.annual_irri))         #is this for only consumptive water uses
         self.output_max.append(787416)
@@ -166,7 +162,7 @@ class VoltaModel:
             self.log_objectives = False
 
     def get_log(self):
-        return self.blevel_Ak, self.rirri, self.rflood, self.renv           #***add rarea for inundated area ?
+        return self.blevel_Ak, self.rirri, self.rflood, self.renv           
                 
     def apply_rbf_policy(self, rbf_input):
 
@@ -453,68 +449,25 @@ class VoltaModel:
         
         return sto_ak, rel_i, rel_d, rel_f, hp[0], hp_kp[0]
 
-    #OBJECTIVE FUNCTIONS
+    ## OBJECTIVE FUNCTIONS  ##
     
-    # Number of flood events
+    # Flood protection
     # Maximization function
-    def flood_protectn_rel(self, h, h_target):        
+    def g_flood_protectn_rel(self, h, h_target):        
         f = 0
-
         for i, h_i in np.ndenumerate(h):            #enumerates each element in an N-dimensional array
-            if h_i > h_target:                      #count, if the water level on the day is greater than the target level for that day (flood threshold)
+            tt = i[0] % self.n_days_one_year
+            if h_i >= h_target[tt]:                      #count, if the water level on the day is greater than the target level (flood threshold)
                 f = f + 1
 
         G = 1 - (f / np.sum(h_i < h_target))            # 1 minus the ratio of number of days there are floods to the number of days there are no floods (the smaller the ratio the better)
         return G
 
-    # Inundated area during floods
-    # Minimization function of area inundated during floods ****need help to fix this
-    def g_inundated_area(self, q, qThreshold):  
-        A = 0   
-        #*** when there is flow through spillways  recall(qM_F = maxSpill)
-        #add q_F and q_D to get total flow downstream
-        for i, q_i in np.ndenumerate(q):
-            q1_i= q_i  * 0.028316847
-            #cfs_to_cumecs =   0.028316847  
-            if q1_i <= qThreshold:
-                A == 0
-            elif qThreshold < q1_i <= 3000:
-                A == (0.2229 * q_i) - 512.57
-            elif 3000< q1_i <= 10000:
-                A == ((2 * 10**-6)* (q1_i**2)) - (0.0098*q1_i) + 173.9
-            elif q1_i > 10000:
-                A == ((3 * 10**-5)* (q1_i**2)) - (0.593*q1_i) + 3202.6
-            else:
-                A == 818.3
 
-            return A #inundated are in km2
-
-    #E-flows
-    #Minimization function of the difference between q1 and qTarget with larger differences penalized more (hence the squaring)
-    """
-    def g_shortage_index(self, q, qTarget):        #for e-flows *** is this right? by using conditions, does the specified value for self.clam_eflows matter? 
-        for i, q_i in np.ndenumerate(q):          #enumerates each element in an N-dimensional array
-            tt = i[0] % self.n_days_one_year        ## dividing the ith timestep in the simulation by 365 and taking the reminder gives the day in the year
-            while tt <= 90 or tt >= 305:
-                if q_i >= 300:
-                    qTarget[tt] == 300
-                elif q_i <= 50:
-                    qTarget[tt] == 50
-                else:
-                    qTarget[tt] = q
-    
-        delta = 24 * 3600
-        qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year)) #This is just a transformation to get qTarget in the same dimension/length as q1
-        maxarr = abs((qTarget * delta) - (q * delta))
-        gg = maxarr / (qTarget * delta)
-        g = np.mean(np.square(gg))
-        return g
-    """
-    
+    #E-flows   
     #Maximization function of the number of days from Nov to March when flows fall within the recommended e-flows range
     def g_eflows_index(self, q, lTarget, uTarget):
         e = 0
-                
         for i, q_i in np.ndenumerate(q):            # enumerates each element in an N-dimensional array
             tt = i[0] % self.n_days_one_year        # dividing the ith timestep in the simulation by 365 and taking the reminder gives the day in the year
             while tt <= 90 or tt >= 305:            #considering the period, November to March
@@ -527,24 +480,26 @@ class VoltaModel:
     
     #Irrigation
     #Maximization function Maximization function based on the daily irrigation demand and the actual water diverted at the irrigation intake point
-    def g_vol_rel(self, q1, qTarget):       #q1 = flow on ith day;      qTarget = target flow/water demand
+    def g_vol_rel(self, q, qTarget):       #q = flow on ith day;      qTarget = target flow/water demand
         delta = 24 * 3600
-        qTarget = np.tile(qTarget, int(len(q1) / self.n_days_one_year))
-        #Transformation to get qTarget in the same dimension/length as q1       
-        g = (q1 * delta) / (qTarget * delta)    #multiplied by 24*3600 to convert from flow to volume
+        qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year))  #Transformation to get qTarget in the same dimension/length as q      
+        g = (q * delta) / (qTarget * delta)    #multiplied by 24*3600 to convert from flow to volume
         G = utils.computeMean(g)
         return G
     
     
     #Minimization function of the difference between the p1 and pTarget (for annual hydropower)
     def g_hydro_rel(self, p, pTarget):       
-        pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))      
-        g = (p - pTarget)    
-        G = np.mean(np.square(g))
+        pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))  #Transformation to get pTarget in the same dimension/length as p1 (so the year long daily timeseries is repeated/tiled for the number of years in the time series )
+        #sum both p and pTarget for each year (pTarget is a year long time series with each day = 4415/365 so it will add up to the annual target of 4415GWh)
+        pTarget1 = pTarget.sum(axis =0)
+        p1 = p.sum(axis =0)
+        g = (p1 - pTarget1)    
+        G = np.mean(np.square(g))       
         return G
 
     def simulate(self, input_variable_list_var, inflow_Ak_n_sim,
-                 fixedhead_Kpong_n_kp, evap_Ak_e_ak,  opt_met):
+                 fixedhead_Kpong_n_kp, evap_Ak_e_ak,  opt_met):     #still not clear what opt_met is
         # Initializing daily variables
         # storages and levels
 
@@ -558,7 +513,7 @@ class VoltaModel:
         release_d = np.empty(shape) #downstream release (hydro, e-flows)
         release_f = np.empty(shape) #flood
         
-        # hydropower production/
+        # hydropower production
         hydropowerProduction_Ak = []  # energy production at Akosombo
         hydropowerProduction_Kp = []  # energy production at Kpong
 
@@ -575,7 +530,7 @@ class VoltaModel:
         year = 0
 
         # run simulation
-        for t in range(self.time_horizon_H):
+        for t in range(self.time_horizon_H):                #don't get this
             day_of_year = t % self.n_days_in_year
             if day_of_year % self.n_days_in_year == 0 and t != 0:
                 year = year + 1
@@ -590,8 +545,8 @@ class VoltaModel:
             daily_release_d = np.empty(shape)
             daily_release_f = np.empty(shape)
 
-            # initialization of sub-daily cycle             ***is this necessary for Volta where timestep is daily?
-            daily_level_ak[0] = level_ak[t]  # level_ak[day_of_year] <<< in flood
+            # initialization of sub-daily cycle             
+            daily_level_ak[0] = level_ak[t]  
             daily_storage_ak[0] = storage_ak[t]
 
             # sub-daily cycle
@@ -629,9 +584,9 @@ class VoltaModel:
 
                 # Hydropower production
                 hydropowerProduction_Ak.append(
-                    ss_rr_hp[4])  # daily energy production (MWh/day) at Akosombo
+                    ss_rr_hp[4])  # daily energy production (GWh/day) at Akosombo
                 hydropowerProduction_Kp.append(
-                    ss_rr_hp[5])  # daily energy production (MWh/day) at Kpong
+                    ss_rr_hp[5])  # daily energy production (GWh/day) at Kpong
 
             # daily values
             level_ak[day_of_year + 1] = daily_level_ak[self.decisions_per_day]
@@ -648,20 +603,14 @@ class VoltaModel:
             self.rflood.append(release_f)
 
         # compute objectives
-        j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.n_years   # GWh/year #maximization 
-        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak, hydropowerProduction_Kp)),self.annual_power) #minimization of deviation from target of 4415GWh
+        j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.n_years   # GWh/year  # Maximization of annual hydropower
+        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak, hydropowerProduction_Kp)),self.annual_power) # Minimization of deviation from target of 4415GWh
         
         j_hyd_d = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.time_horizon_H #GWh/day  (self.time_horizon_H= self.n_days_in_year * self.n_years)
-        #Add alternative Maximization of daily hydropower at 90 per cent reliability over the hydrological ensemble
+        #This is just a maximization of daily hydropower. Need to add the bit about 90 per cent reliability over the hydrological ensemble
         
         j_irri = self.g_vol_rel(release_i, self.annual_irri)
         j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u)
-        j_fldcntrl = self.flood_protectn_rel(storage_ak, self.flood_protection)#
-        j_inun = self.g_inundated_area(release_f, self.inundated_area)
+        j_fldcntrl = self.g_flood_protectn_rel(storage_ak, self.flood_protection)#)
 
-        return j_hyd_a, j_hyd_d, j_irri, j_env, j_fldcntrl, j_inun
-            
-
-
-
-        
+        return j_hyd_a, j_hyd_d, j_irri, j_env, j_fldcntrl
