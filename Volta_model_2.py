@@ -95,19 +95,25 @@ class VoltaModel:
             self.evaluate = self.evaluate_mc
            
            
-        #Objective parameters  (#to be replaced with daily timeseries for a year)
-        self.annual_power = 4415
-        # annual hydropower target (GWh)
-        self.daily_power = 6
-        # minimum (firm) daily power requirement (GWh)
-        self.annual_irri = 1342
-        # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
-        self.flood_protection = 276
-        # reservoir level above which spilling is triggered. 
-        self.clam_eflows_l = 50 
-        # lower bound of of e-flow required in November to March (m3/s)
-        self.clam_eflows_u = 330
-        # upper bound of of e-flow required in November to March (m3/s)
+        #Objective parameters
+        self.annual_power = utils.loadVector(
+            create_path("./Objective_parameters/annual_power.txt"), self.n_days_one_year
+        )   # annual hydropower target (GWh)
+        self.daily_power = utils.loadVector(
+            create_path("./Objective_parameters/min_power.txt"), self.n_days_one_year
+        )   # minimum (firm) daily power requirement (GWh)
+        self.annual_irri = utils.loadVector(
+            create_path("./Objective_parameters/irrigation_demand.txt"), self.n_days_one_year
+        )  # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
+        self.flood_protection = utils.loadVector(
+            create_path("./Objective_parameters/h_flood.txt"), self.n_days_one_year
+        )  # reservoir level above which spilling is triggered (ft) 
+        self.clam_eflows_l = utils.loadVector(
+            create_path("./Objective_parameters/l_eflows.txt"), self.n_days_one_year
+        )  # lower bound of of e-flow required in November to March (cfs) (=50 m3/s)
+        self.clam_eflows_u = utils.loadVector(
+            create_path("./Objective_parameters/u_eflows.txt"), self.n_days_one_year
+        )  # upper bound of of e-flow required in November to March (cfs) (=330 m3/s)
         
         # standardization of the input-output of the RBF release curve      (#***not clear so not sure what the Lower Volta equivalent for the 120 is)
         self.input_max.append(self.n_days_in_year * self.decisions_per_day - 1) 
