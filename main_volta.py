@@ -58,7 +58,7 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
 
 
     header = ["annual_hydropower", "daily_hydropower", "irrigation",
-              "environment", "flood_control", "inundated_area"]
+              "environment", "flood_control"]
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
         writer = csv.writer(f)
@@ -79,29 +79,30 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
 
 
 def main():
-    seeds = [10, ]  # , 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    seeds = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     for entry in [
-                  rbf_functions.squared_exponential_rbf,
-                  rbf_functions.gaussian_rbf,
-                  # rbf_functions.multiquadric_rbf,
-                  rbf_functions.inverse_quadric_rbf
-        ]:
+                  #rbf_functions.original_rbf,
+        rbf_functions.squared_exponential_rbf,
+        rbf_functions.inverse_multiquadric_rbf,
+        #rbf_functions.inverse_quadratic_rbf,
+        #rbf_functions.exponential_rbf,
+        rbf_functions.matern32_rbf,
+        #rbf_functions.matern52_rbf,
+   ]:
         for seed in seeds:
             random.seed(seed)
 
             # RBF parameters
             n_inputs = 2  # (time, storage of Akosombo)
-            n_outputs = 4    #3?(irrigation and downstream release but with floods separated)
-            n_rbfs = 4
-            rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs,
-                                    rbf_function=entry)
+            n_outputs = 3    #(irrigation and downstream release but with floods separated)
+            n_rbfs = 4      # how is this determined
+            rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs, rbf_function=entry)
 
             # Initialize model
-            n_objectives = 6
+            n_objectives = 5
             n_years = 1
 
-            lowervolta_river = VoltaModel(108.5, 505.0, 5, n_years,
-                                                 rbf)
+            lowervolta_river = VoltaModel(265, 505, n_years, rbf)
             lowervolta_river.set_log(False)
 
             # Lower and Upper Bound for problem.types
@@ -112,12 +113,11 @@ def main():
             problem.types[:] = rbf.platypus_types
             problem.function = lowervolta_river.evaluate
 
-            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower #***I see that all of these are maximize even though i'd expect that the env function should be minimized...
+            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower #***I see that all of these are maximize even though the env function should be minimized...
             problem.directions[1] = Problem.MAXIMIZE  # daily hydropower
             problem.directions[2] = Problem.MAXIMIZE  # irrigation
             problem.directions[3] = Problem.MAXIMIZE  # environment
             problem.directions[4] = Problem.MINIMIZE  # flood events
-            problem.directions[5] = Problem.MAXIMIZE  # flooded area
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
