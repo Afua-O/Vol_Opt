@@ -70,7 +70,7 @@ class VoltaModel:
         
         
         #Akosombo Characteristics
-        self.lsv_rel = utils.loadMatrix (
+        self.lsv_rel = utils.loadMatrix(
             create_path("./Data/Akosombo_xtics/1.Level-Surface area-Volume/lsv_Ak.txt"), 3, 6 
             )  # level (ft) - Surface (acre) - storage (acre-feet) relationship
         self.turbines = utils.loadMatrix(
@@ -120,6 +120,7 @@ class VoltaModel:
         self.input_max.append(120)  #***not clear so not sure what the Lower Volta equivalent is ( max reservoir level?)                                            
         
         self.output_max.append(utils.computeMax(self.annual_irri))
+        self.output_max.append(utils.computeMax(self.flood_protection))
         self.output_max.append(787416)
         # max release = total turbine capacity + spillways @ max storage (56616 + 730800= 787416 cfs)
 
@@ -132,7 +133,7 @@ class VoltaModel:
             create_path("./Data/Historical_data/Inflow(cfs)_to_Akosombo_1984-2012.txt"),
             self.n_years, self.n_days_one_year
             )  # inflow, i.e. flows to Akosombo (cfs) 1984-2012     
-        self.tailwater = utils.loadMultiVector(
+        self.tailwater_Ak = utils.loadMultiVector(
             create_path("./Data/Historical_data/3.Tailwater/tailwater_Ak.txt"), 
             self.n_years, self.n_days_one_year
             ) # historical tailwater level @ Akosombo (ft) 1984-2012
@@ -143,20 +144,20 @@ class VoltaModel:
         
         
     def load_stochastic_data(self):   # stochastic hydrology###   no stochastic data yet
-        self.evap_Ak = utils.loadMultiVector(
+        self.evap_Ak = utils.loadMatrix(
             create_path("./Data/Stochastic_data/Akosombo_ET_stochastic.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo_ stochastic data (inches per day)
-        self.inflow_Ak = utils.loadMultiVector(
+        self.inflow_Ak = utils.loadMatrix(
             create_path("./Data/Stochastic_data/Inflow(cfs)_to_Akosombo_stochastic.txt"),
             self.n_years, self.n_days_one_year
         )  # inflow, i.e. flows to Akosombo_stochastic data     
-        self.tailwater_Ak = utils.loadMultivector(
+        self.tailwater_Ak = utils.loadMatrix(
             create_path("./Data/Stochastic_data/3.Tailwater/tailwater_Ak.txt"), 
             self.n_years, self.n_days_one_year
             ) # tailwater level @ Akosombo (ft) 1981-2013
-        self.fh_Kpong = utils.loadMultivector(create_path(
-            "./Data/Stochastic_datas/1.Fixed_head/fh_Kpong.txt"),
+        self.fh_Kpong = utils.loadMatrix(
+            create_path("./Data/Stochastic_datas/1.Fixed_head/fh_Kpong.txt"),
             self.n_years, self.n_days_one_year
             ) # fixed head Kpong (ft)
         
@@ -187,7 +188,7 @@ class VoltaModel:
         return scaled_output
 
     def evaluate_historic(self, var, opt_met=1):    #  what are var and opt_met?**
-        return self.simulate(var, self.evap_Ak, self.inflow_Ak,
+        return self.simulate(var, self.inflow_Ak, self.evap_Ak, 
                              self.tailwater_Ak, self.fh_Kpong, opt_met)
     
     
@@ -199,8 +200,8 @@ class VoltaModel:
             Jhydropower_a, Jhydropower_d, Jirrigation, Jenvironment ,\
                 Jfloodcontrol = self.simulate(
                 var,
-                self.evap_Ak,
                 self.inflow_Ak,
+                self.evap_Ak,
                 self.tailwater_Ak, 
                 self.fh_Kpong,
                 opt_met,
@@ -304,11 +305,10 @@ class VoltaModel:
 
     @staticmethod
     @njit
-    def g_hydAk(r, h, day_of_year, hour0, GG, gammaH20, tailwater, turbines):
+    def g_hydAk(r, h, day_of_year, hour0, GG, gammaH20, tailwater_Ak, turbines):
      # hydropower @ Akosombo =f(release through turbines, water level/headwater level,
                              # day of year, hour, gravitational acc,
-                             #water density, tailwater level, flow through turbines)  
-             
+                             #water density, tailwater level, flow through turbines)      
         cubicFeetToCubicMeters = 0.0283  # 1 cf = 0.0283 m3
         feetToMeters = 0.3048  # 1 ft = 0.3048 m
         Nturb = 6 #number of turbines at Akosombo
@@ -317,7 +317,7 @@ class VoltaModel:
         c_hour = len(r) * hour0
         for i in range(0, len(r)):
             print(i)
-            deltaH = h[i] - tailwater[i], #water level (h) - tailwater level (self.tailwater?) on the ith day = net hydraulic head  #is this correct?****
+            deltaH = h[i] - tailwater_Ak[i], #water level (h) - tailwater level (self.tailwater?) on the ith day = net hydraulic head  #is this correct?****
             q_split = r[i]      #for when some turbines are shut
             for j in range(0, Nturb):
                 if q_split < turbines[1][j]: #if the release (recall q_split= r[i]), is less than the min capacity of the turbines, the q_split/release is 0
@@ -383,7 +383,7 @@ class VoltaModel:
         Gp_Kp = np.sum(np.asarray(g_hyd_Kp))
         return Gp_Kp
 
-    def res_transition_h(self, s0, uu, n_sim, ev,
+    def res_transition_h(self, s0, uu, n_sim, ev, n_sim_kp, n_tail,
                           day_of_year, hour0):
         #s0-storage_Akosombo, uu- prescribed release policy, n_sim-inflow @Ak
         # ev- evaporation_Ak, #n_sim_kp- fixed head @Kp, day_of_year
@@ -425,7 +425,7 @@ class VoltaModel:
             #WS = release_I[i]
 
             # Compute surface level and evaporation loss
-            surface_Ak = self.level_to_surface(level_Ak[i], 1)
+            surface_Ak = self.level_to_surface(level_Ak[i])
             evaporation_losses_Ak = utils.inchesToFeet(ev) * surface_Ak / 86400 
                                      # cfs _ daily ET
             
@@ -450,7 +450,7 @@ class VoltaModel:
             hour0,
             self.GG,
             self.gammaH20,
-            self.tailwater,
+            self.tailwater_Ak,
             self.turbines,
         )
         
@@ -517,7 +517,7 @@ class VoltaModel:
 
     #self.simulate(var, self.evap_Ak, self.inflow_Ak,
                          #self.tailwater_Ak, self.fh_Kpong, opt_met)
-    def simulate(self, input_variable_list_var, evap_Ak_e_ak, inflow_Ak_n_sim,
+    def simulate(self, input_variable_list_var, inflow_Ak_n_sim, evap_Ak_e_ak, 
                  tailwater_Ak, fixedhead_Kpong_n_kp,  opt_met):     #still not clear what opt_met is #check tailwater and fixed head inclusion
         # Initializing daily variables
         # storages and levels
@@ -542,7 +542,7 @@ class VoltaModel:
 
         # initial condition
         level_ak[0] = self.init_level
-        storage_ak[0] = self.level_to_storage(level_ak[0], 1)   #should this last number be 0?***
+        storage_ak[0] = self.level_to_storage(level_ak[0])
 
         # identification of the periodicity (365 x fdays)
         decision_steps_per_year = self.n_days_in_year * self.decisions_per_day
@@ -583,7 +583,7 @@ class VoltaModel:
                     rbf_input = np.asarray([jj, daily_level_ak[j]])
                     uu = self.apply_rbf_policy(rbf_input)
 
-                #def res_transition_h(self, s0, uu, n_sim, ev, n_sim_kp,
+                #def res_transition_h(self, s0, uu, n_sim, ev, n_tail, n_sim_kp,
                                       #day_of_year, hour0)
                 # system transition 
                 ss_rr_hp = self.res_transition_h(
@@ -591,6 +591,7 @@ class VoltaModel:
                     uu,
                     inflow_Ak_n_sim[year][day_of_year],
                     evap_Ak_e_ak[year][day_of_year],
+                    tailwater_Ak[year][day_of_year],
                     fixedhead_Kpong_n_kp[year][day_of_year],
                     day_of_year,
                     j,
