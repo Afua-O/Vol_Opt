@@ -79,7 +79,7 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
 
 
 def main():
-    seeds = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    seeds = [10, ]#, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     for entry in [
                   #rbf_functions.original_rbf,
         rbf_functions.squared_exponential_rbf,
@@ -102,7 +102,7 @@ def main():
             n_objectives = 5
             n_years = 1
 
-            lowervolta_river = VoltaModel(265, 505, n_years, rbf)
+            lowervolta_river = VoltaModel(265.0, 505.0, n_years, rbf)
             lowervolta_river.set_log(False)
 
             # Lower and Upper Bound for problem.types
