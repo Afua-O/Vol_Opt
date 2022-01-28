@@ -73,16 +73,16 @@ class VoltaModel:
         self.lsv_rel = utils.loadMatrix(
             create_path("./Data/Akosombo_xtics/1.Level-Surface area-Volume/lsv_Ak.txt"), 3, 6 
             )  # level (ft) - Surface (acre) - storage (acre-feet) relationship
-        self.turbines = utils.loadMatrix(
-            create_path("./Data/Akosombo_xtics/2.Turbines/turbines_Ak.txt"), 3, 6
-            )  # Max capacity (cfs) - min capacity (cfs) - efficiency of each Akosombo plant turbine (6 turbines)
+        self.turbines = utils.loadVector(
+            create_path("./Data/Akosombo_xtics/2.Turbines/turbines_Ak2.txt"), 3
+            )  # Max capacity (cfs) - min capacity (cfs) - efficiency of each Akosombo plant turbine (6 identical turbines)
         self.spillways = utils.loadMatrix(
             create_path("./Data/Akosombo_xtics/4.Spillways/spillways_Ak.txt"), 3, 4
             ) #level (ft) - max release (cfs) - min release (cfs) for level > 276 ft
                 
         #Kpong Characteristics
-        self.turbines_Kp = utils.loadMatrix(
-            create_path("./Data/Kpong_xtics/2.Turbine/turbines_Kp.txt"), 3, 4 
+        self.turbines_Kp = utils.loadVector(
+            create_path("./Data/Kpong_xtics/2.Turbine/turbines_Kp2.txt"), 3 
             ) #Max capacity (cfs) - min capacity (cfs) - efficiency of Kpong (4 identical turbines)
         
         
@@ -122,23 +122,23 @@ class VoltaModel:
         self.output_max.append(utils.computeMax(self.annual_irri))
         self.output_max.append(utils.computeMax(self.flood_protection))
         self.output_max.append(787416)
-        # max release = total turbine capacity + spillways @ max storage (56616 + 730800= 787416 cfs)
+        # max release = total turbine capacity + spillways @ max storage (56616 + 730800= 787416 cfs) # should this be just total turbine capacity?
 
     def load_historic_data(self):   #ET, inflow, Akosombo tailwater, Kpong fixed head
         self.evap_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors/evapAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2/evapAk_history.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo 1984-2012 (inches per day)
         self.inflow_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors/InflowAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2/InflowAk_history.txt"),
             self.n_years, self.n_days_one_year
             )  # inflow, i.e. flows to Akosombo (cfs) 1984-2012     
         self.tailwater_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors/tailwaterAk_history.txt"), 
+            create_path("./Data/Historical_data/vectors2/tailwaterAk_history.txt"), 
             self.n_years, self.n_days_one_year
             ) # historical tailwater level @ Akosombo (ft) 1984-2012
         self.fh_Kpong = utils.loadMultiVector(create_path(
-            "./Data/Historical_data/vectors/fhKp_history.txt"),
+            "./Data/Historical_data/vectors2/fhKp_history.txt"),
             self.n_years, self.n_days_one_year
             ) # historical fixed head @ Kpong (ft) 1984-2012  
         
@@ -283,7 +283,7 @@ class VoltaModel:
 
     @staticmethod
     @njit 
-    def g_hydAk(r, h, day_of_year, hour0, GG, gammaH20, tailwater_Ak, #using historical average tailwater level temporarily
+    def g_hydAk(r, h, day_of_year, hour0, GG, gammaH20, tailwater_Ak, 
                 turbines):
      # hydropower @ Akosombo =f(release through turbines, water level/headwater level,
                              # day of year, hour, gravitational acc,
@@ -292,13 +292,16 @@ class VoltaModel:
         cubicFeetToCubicMeters = 0.0283  # 1 cf = 0.0283 m3
         feetToMeters = 0.3048  # 1 ft = 0.3048 m
         Nturb = 6 #number of turbines at Akosombo
-        g_hyd = [] 
-        pp = [] #power generated in GWh
+        g_hyd = [] #power generated in GWh each day
+        pp = [] #power generated in GWh @ each turbine per day
+        qrel =[] #flow release through each turbune per day
+        A_qrel =[] #flow release through turbines at Akosombo
         c_hour = len(r) * hour0
+        x=0
         for i in range(0, len(r)):
             print(i)
             
-            if i > 8035:  #efficiency of turbines increased from 0.9 to 0.93 in 2006 [(2006-1984)*365] + [(2006-1984)/4 (rounded down for leap yaer days)]
+            if x < 8035:  #efficiency of turbines increased from 0.9 to 0.93 in 2006 [(2006-1984)*365] + [(2006-1984)/4 (rounded down for leap yaer days)]
                 eff = 0.9
             else:
                 eff =0.93
@@ -307,10 +310,10 @@ class VoltaModel:
             
             q_split = r[i]      #for when some turbines are shut
             for j in range(0, Nturb):
-                if q_split < turbines[1][j]: #if the release (recall q_split= r[i]), is less than the min capacity of the turbines, the q_split/release is 0
+                if q_split < 0: #if the release (recall q_split= r[i]), is less than the min capacity of the turbines, the q_split/release is 0
                     qturb = 0.0
-                elif q_split > turbines[0][j]: #if release > max capacity of turbines, its capped at max
-                    qturb = turbines[0][j]
+                elif q_split > turbines[0]: #if release > max capacity of turbines, its capped at max
+                    qturb = turbines[0]
                 else:
                     qturb = q_split
                 q_split = q_split - qturb
@@ -321,21 +324,26 @@ class VoltaModel:
                         * gammaH20 #density of water
                         * (cubicFeetToCubicMeters * qturb) #flow through turbines
                         * (feetToMeters * deltaH) # net hydraulic head
-                         #power generated W 
-                        / (1000000) # conversion from W to GW
+                        * 3600
+                         #power generated Wh 
+                        / (3600*1000000) # conversion from Wh to GWh/h #cancels out but to explain the process
                 )  # daily energy prouction
+                x= x + 1
                 
                 pp.append(p)
+                qrel.append(qturb)
             g_hyd.append(np.sum(np.asarray(pp)))
+            A_qrel.append(np.sum(np.asarray(qrel)))        
             pp.clear()
+            qrel.clear()
             c_hour = c_hour + 1
-        Gp = np.sum(np.asarray(g_hyd))
-        return Gp
+        Gp = np.asarray(g_hyd)
+        return Gp, A_qrel
 
     @staticmethod
     @njit
-    def g_hydKp(r, day_of_year, hour0, GG, gammaH20, turbines_Kp):   #(r, fixedhead, day_of_year, hour0, GG, gammaH20, turbines_Kp)
-     # hydropower @ Kpong =f(flow release, fixed head, day of year,  #using historical average fixedhead
+    def g_hydKp(r, fixedhead, day_of_year, hour0, GG, gammaH20, turbines_Kp):   
+     # hydropower @ Kpong =f(flow release, fixed head, day of year,  
                              # gravitational acc,
                              #water density, flow through turbines)  
      
@@ -345,22 +353,23 @@ class VoltaModel:
         g_hyd_Kp = []
         pp_K = [] #power generated in GWh
         c_hour = len(r) * hour0
+        x = 0
         for i in range(0, len(r)):
             print(i)
             
-            if i > 8035:  #efficiency of turbines increased from 0.9 to 0.93 in 2006 [(2006-1984)*365] + [(2006-1984)/4 (rounded down for leap yaer days)]
+            if x < 8035:  #efficiency of turbines increased from 0.9 to 0.93 in 2006 [(2006-1984)*365] + [(2006-1984)/4 (rounded down for leap yaer days)]
                 eff = 0.9
             else:
                 eff =0.93
                 
-            deltaH = 38232 #fixedhead[i], #fixed head
+            deltaH = fixedhead[i], #fixed head
              
             q_split = r[i]      #for when some turbines are shut
             for j in range(0, n_turb):
-                if q_split < turbines_Kp[1][j]:
+                if q_split < 0:
                     qturb = 0.0
-                elif q_split > turbines_Kp[0][j]:
-                    qturb = turbines_Kp[0][j]
+                elif q_split > turbines_Kp[0]:
+                    qturb = turbines_Kp[0]
                 else:
                     qturb = q_split
                 q_split = q_split - qturb
@@ -371,15 +380,17 @@ class VoltaModel:
                         * gammaH20 #density of water
                         * (cubicFeetToCubicMeters * qturb) #flow through turbines
                         * (feetToMeters * deltaH) # net hydraulic head
-                         #power generated W
-                        / (1000000) # conversion from W to GW
+                        * 3600
+                         #power generated Wh 
+                        / (3600*1000000) # conversion from Wh to GWh/h #cancels out but to explain the process
                 )  # daily energy prouction
+                x = x + 1
                 
                 pp_K.append(p)
             g_hyd_Kp.append(np.sum(np.asarray(pp_K)))
             pp_K.clear()
             c_hour = c_hour + 1
-        Gp_Kp = np.sum(np.asarray(g_hyd_Kp))
+        Gp_Kp = np.asarray(g_hyd_Kp)
         return Gp_Kp
 
     def res_transition_h(self, s0, uu, n_sim, ev, 
@@ -455,7 +466,7 @@ class VoltaModel:
         
         hp_kp = VoltaModel.g_hydKp(
             np.asarray(release_D),
-           # self.fh_Kpong,
+            self.fh_Kpong,
             day_of_year,
             hour0,
             self.GG,
@@ -464,7 +475,7 @@ class VoltaModel:
         )
         
         return sto_ak, rel_i, rel_d, rel_f, hp[0], hp_kp[0]
-                  #not sure about this
+                  
 
     ## OBJECTIVE FUNCTIONS  ##
     
@@ -538,7 +549,9 @@ class VoltaModel:
 
         # release decision variables (irrigation) only
         # Downstream in Baseline
-        self.rbf.set_decision_vars(np.asarray(input_variable_list_var))
+        #self.rbf.set_decision_vars(np.asarray(input_variable_list_var))
+        self.rbf.set_decision_vars(np.zeros(24))
+        #self.rbf.set_decision_vars(np.asarray([1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1 ]))
 
         # initial condition
         level_ak[0] = self.init_level
@@ -623,8 +636,8 @@ class VoltaModel:
             self.rflood.append(release_f)
 
         # compute objectives
-        j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.n_years   # GWh/year  # Maximization of annual hydropower
-        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak, hydropowerProduction_Kp)),self.annual_power) # Minimization of deviation from target of 4415GWh
+        #j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.n_years   # GWh/year  # Maximization of annual hydropower
+        j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak, hydropowerProduction_Kp)),self.annual_power) # Minimization of deviation from target of 4415GWh
         
         j_hyd_d = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.time_horizon_H #GWh/day  (self.time_horizon_H= self.n_days_in_year * self.n_years)
         #This is just a maximization of daily hydropower. Need to add the bit about 90 per cent reliability over the hydrological ensemble
