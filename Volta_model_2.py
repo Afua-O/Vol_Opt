@@ -362,7 +362,7 @@ class VoltaModel:
             else:
                 eff =0.93
                 
-            deltaH = fixedhead[i], #fixed head
+            deltaH = fixedhead[i] #fixed head
              
             q_split = r[i]      
             for j in range(0, n_turb):
