@@ -9,7 +9,7 @@ Created on Wed Nov 24 13:28:27 2021
 import os
 import numpy as np
 
-#import rbf_functions 
+import rbf_functions 
 #Install using pip and restart kernel if unavailable
 import utils #install using:  pip install utils
 from numba import njit #pip install numba #restart kernel (Ctrl + .)
@@ -23,7 +23,7 @@ def create_path(rest):
 class VoltaModel:
     gammaH20 = 1000.0 #density of water- 1000 kg/m3
     GG = 9.81 #acceleration due to gravity- 9.81 m/s2
-    n_days_in_year = 365 #days in a year                             #(leap year??***)
+    n_days_in_year = 365 #days in a year                            
     
     #initial conditions
     def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=True):
@@ -42,7 +42,7 @@ class VoltaModel:
         self.init_level = l0_Akosombo  # initial water level @ start of simulation
         self.day0 = d0 # start day  
         
-        self.log_level_release = False                                         #(there's a FIXME here in the Sasquehana***)
+        self.log_level_release = False                                        
         
         # variables from the header file 
         self.input_min = []
@@ -53,15 +53,15 @@ class VoltaModel:
         # log level / release                                   
         self.blevel_Ak = [] # water level at Akosombo
         self.rirri = []     # water released for irrigation
-        self.rflood = []    # flood release
         self.renv = []      # environmental flow release
+        self.rflood = []    # flood release
         
         # historical record (1965- 2016) and 1000 year simulation horizon (using extended dataset)
-        self.n_years = n_years #what is n_years? (I thought it was the number of years of data so 29 for historical and 1000 for stochastic)
+        self.n_years = n_years # number of years of data
         self.time_horizon_H = self.n_days_in_year * self.n_years    #simulation horizon
         self.hours_between_decisions = 24  # daily time step
         self.decisions_per_day = int(24 / self.hours_between_decisions)
-        self.n_days_one_year = 365      # isnt this repeted? see line 26
+        self.n_days_one_year = 365 
         
         # Constraints for the reservoirs
         self.min_level_Akosombo = 240  # ft _ min level for hydropower generation and (assumed) min level for irrigation intakes
@@ -117,7 +117,7 @@ class VoltaModel:
         
         # standardization of the input-output of the RBF release curve      
         self.input_max.append(self.n_days_in_year * self.decisions_per_day - 1) #max number of inputs
-        self.input_max.append(276)  ##max resevoir level in ft                                            
+        self.input_max.append(276)  #max resevoir level in ft                                            
         
         self.output_max.append(utils.computeMax(self.annual_irri))
         self.output_max.append(utils.computeMax(self.flood_protection))
@@ -183,11 +183,11 @@ class VoltaModel:
         scaled_output = normalized_output * self.output_max
 
         # uu = []
-        # for i in range(0, self.):
-        #     uu.append(u[i] * self.output_max[i])
+        # for i in range(0, self.): #whats self.?
+        #     uu.append(uu[i] * self.output_max[i])
         return scaled_output
 
-    def evaluate_historic(self, var, opt_met=1):    #  what is var (input variable list- rbf inputs?)?**
+    def evaluate_historic(self, var, opt_met=1):  
         return self.simulate(var, self.inflow_Ak, self.evap_Ak, self.tailwater_Ak, self.fh_Kpong, opt_met)
     
     
@@ -294,10 +294,10 @@ class VoltaModel:
         Nturb = 6 #number of turbines at Akosombo
         g_hyd = [] #power generated in GWh each day
         pp = [] #power generated in GWh @ each turbine per day
-        qrel =[] #flow release through each turbune per day
+        qrel =[] #flow release through each turbine per day
         A_qrel =[] #flow release through turbines at Akosombo
         c_hour = len(r) * hour0
-        x=0
+        x=0 #to count the timesteps until 2006 when turbine were retrofitted
         for i in range(0, len(r)):
             print(i)
             
@@ -306,13 +306,13 @@ class VoltaModel:
             else:
                 eff =0.93
                 
-            deltaH = h[i] - tailwater_Ak[i] #water level (h) - tailwater level (self.tailwater?) on the ith day = net hydraulic head  #is this correct?****
+            deltaH = h[i] - tailwater_Ak[i] #water level (h) - tailwater level 
             
-            q_split = r[i]      #for when some turbines are shut
+            q_split = r[i]      #cycling release through the turbines
             for j in range(0, Nturb):
-                if q_split < 0: #if the release (recall q_split= r[i]), is less than the min capacity of the turbines, the q_split/release is 0
+                if q_split < 0: 
                     qturb = 0.0
-                elif q_split > turbines[0]: #if release > max capacity of turbines, its capped at max
+                elif q_split > turbines[0]: #if release > max capacity of a turbine, its capped at max and the rest goes through the next turbines
                     qturb = turbines[0]
                 else:
                     qturb = q_split
@@ -338,7 +338,7 @@ class VoltaModel:
             qrel.clear()
             c_hour = c_hour + 1
         Gp = np.asarray(g_hyd)
-        return Gp, A_qrel
+        return Gp, A_qrel   #should the r for Kpong be A_qrel?
 
     @staticmethod
     @njit
@@ -357,14 +357,14 @@ class VoltaModel:
         for i in range(0, len(r)):
             print(i)
             
-            if x < 8035:  #efficiency of turbines increased from 0.9 to 0.93 in 2006 [(2006-1984)*365] + [(2006-1984)/4 (rounded down for leap yaer days)]
+            if x < 8035:  
                 eff = 0.9
             else:
                 eff =0.93
                 
             deltaH = fixedhead[i], #fixed head
              
-            q_split = r[i]      #for when some turbines are shut
+            q_split = r[i]      
             for j in range(0, n_turb):
                 if q_split < 0:
                     qturb = 0.0
@@ -383,7 +383,7 @@ class VoltaModel:
                         * 3600
                          #power generated Wh 
                         / (3600*1000000) # conversion from Wh to GWh/h #cancels out but to explain the process
-                )  # daily energy prouction
+                )  # daily energy production
                 x = x + 1
                 
                 pp_K.append(p)
@@ -396,18 +396,18 @@ class VoltaModel:
     def res_transition_h(self, s0, uu, n_sim, ev, 
                           day_of_year, hour0):
         #s0-storage_Akosombo, uu- prescribed release policy, n_sim-inflow @Ak
-        # ev- evaporation_Ak, #n_sim_kp- fixed head @Kp, day_of_year
+        # ev- evaporation_Ak, day_of_year, hour
         HH = self.hours_between_decisions  
         sim_step = 3600  # seconds per hour         
         leak = 0  # cfs loss to groundwater and other leaks. (like in WEAP model = 0)
 
         # Storages and levels of Akosombo and Kpong
-        shape = (HH+1, ) 
+        shape = (HH+1, ) #+1 to account for initial time step @ start of simulation
         
-        storage_Ak = np.empty(shape)   #np.empty returns a new array of given shape and type,
-        level_Ak = np.empty(shape)      
+        storage_Ak = np.empty(shape)   
+        level_Ak = np.empty(shape) 
+        
         # Actual releases (Irrigation, dowstream, flood)
-        
         shape = (HH,) 
         release_I = np.empty(shape) #irrigation
         release_D = np.empty(shape) # downstream relaease including e-flows
@@ -465,7 +465,7 @@ class VoltaModel:
         )
         
         hp_kp = VoltaModel.g_hydKp(
-            np.asarray(release_D),
+            np.asarray(release_D), #should the r for Kpong be A_qrel? Kpong releases what Akosombo releases
             self.fh_Kpong,
             day_of_year,
             hour0,
@@ -484,8 +484,8 @@ class VoltaModel:
     def g_flood_protectn_rel(self, h, h_target):        
         f = 0
         for i, h_i in np.ndenumerate(h):            #enumerates each element in an N-dimensional array
-            tt = i[0] % self.n_days_one_year
-            if h_i >= h_target[tt]:                      #count, if the water level on the day is greater than the target level (flood threshold)
+            tt = i[0] % self.n_days_one_year        # to get the day number
+            if h_i >= h_target[tt]:                 #count, if the water level on the day is greater than the target level (flood threshold)
                 f = f + 1
 
         G = 1 - (f / np.sum(h_i < h_target))            # 1 minus the ratio of number of days there are floods to the number of days there are no floods (the smaller the ratio the better)
@@ -502,12 +502,12 @@ class VoltaModel:
                 if lTarget <= q_i <= uTarget:
                     e = e + 1
                     
-        G = e / 150        # #should this be 120 to account for the fact that meeting the e-flow target 80% of the time is ok?
+        G = e / 150        # how to account for the fact that meeting the e-flow target 80% of the time is ok?
         return G
             
     
     #Irrigation
-    #Maximization function Maximization function based on the daily irrigation demand and the actual water diverted at the irrigation intake point
+    #Maximization function based on the daily irrigation demand and the actual water diverted at the irrigation intake point
     def g_vol_rel(self, q, qTarget):       #q = flow on ith day;      qTarget = target flow/water demand
         delta = 24 * 3600
         qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year))  #Transformation to get qTarget in the same dimension/length as q      
@@ -520,8 +520,8 @@ class VoltaModel:
     def g_hydro_rel(self, p, pTarget):       
         pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))  #Transformation to get pTarget in the same dimension/length as p1 (so the year long daily timeseries is repeated/tiled for the number of years in the time series )
         #sum both p and pTarget for each year (pTarget is a year long time series with each day = 4415/365 so it will add up to the annual target of 4415GWh)
-        pTarget1 = pTarget.sum(axis =0)
-        p1 = p.sum(axis =0)
+        pTarget1 = pTarget.sum(axis = 0)
+        p1 = p.sum(axis = 0)
         g = (p1 - pTarget1)    
         G = np.mean(np.square(g))       
         return G
@@ -530,6 +530,7 @@ class VoltaModel:
                          #self.tailwater_Ak, self.fh_Kpong, opt_met)
     def simulate(self, input_variable_list_var, inflow_Ak_n_sim, evap_Ak_e_ak, 
                  tailwater_Ak, fixedhead_Kpong_n_kp,  opt_met):     #check tailwater and fixed head inclusion
+        
         # Initializing daily variables
         # storages and levels
 
@@ -549,9 +550,8 @@ class VoltaModel:
 
         # release decision variables (irrigation) only
         # Downstream in Baseline
-        #self.rbf.set_decision_vars(np.asarray(input_variable_list_var))
-        self.rbf.set_decision_vars(np.zeros(24))
-        #self.rbf.set_decision_vars(np.asarray([1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1, 1,1,1 ]))
+        self.rbf.set_decision_vars(np.asarray(input_variable_list_var))
+        #self.rbf.set_decision_vars(np.zeros(24))
 
         # initial condition
         level_ak[0] = self.init_level
@@ -566,6 +566,7 @@ class VoltaModel:
             day_of_year = t % self.n_days_in_year
             if day_of_year % self.n_days_in_year == 0 and t != 0:
                 year = year + 1
+                print(t)
 
             # subdaily variables
             shape = (self.decisions_per_day + 1,)
@@ -590,7 +591,7 @@ class VoltaModel:
 
                 # compute decision
                 if opt_met == 0:  # fixed release
-                    # FIXME will crash because uu is empty list #for calibration?
+                    # FIXME will crash because uu is empty list 
                     uu.append(uu[0])
                 elif opt_met == 1:  # RBF-PSO
                     rbf_input = np.asarray([jj, daily_level_ak[j]])
@@ -598,6 +599,8 @@ class VoltaModel:
 
                 #def res_transition_h(self, s0, uu, n_sim, ev,
                                       #day_of_year, hour0)
+                #return sto_ak, rel_i, rel_d, rel_f, hp[0], hp_kp[0]
+                
                 # system transition 
                 ss_rr_hp = self.res_transition_h(
                     daily_storage_ak[j],
@@ -636,10 +639,10 @@ class VoltaModel:
             self.rflood.append(release_f)
 
         # compute objectives
-        #j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.n_years   # GWh/year  # Maximization of annual hydropower
+        #j_hyd_a = sum(hydropowerProduction_Ak, hydropowerProduction_Kp)   # GWh/day need to figure out summation by years  # Maximization of annual hydropower
         j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak, hydropowerProduction_Kp)),self.annual_power) # Minimization of deviation from target of 4415GWh
         
-        j_hyd_d = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) / self.time_horizon_H #GWh/day  (self.time_horizon_H= self.n_days_in_year * self.n_years)
+        j_hyd_d = sum(hydropowerProduction_Ak, hydropowerProduction_Kp) #GWh/day #Maximisation 
         #This is just a maximization of daily hydropower. Need to add the bit about 90 per cent reliability over the hydrological ensemble
         #A similar approach can be used to maximise eflows at 80% reliability
         
