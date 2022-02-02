@@ -79,14 +79,14 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
 
 
 def main():
-    seeds = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] 
+    seeds = [10] #, 20, 30, 40, 50, 60, 70, 80, 90, 100] 
     for entry in [
                   #rbf_functions.original_rbf,
         rbf_functions.squared_exponential_rbf,
-        rbf_functions.inverse_multiquadric_rbf,
+        #rbf_functions.inverse_multiquadric_rbf,
         #rbf_functions.inverse_quadratic_rbf,
         #rbf_functions.exponential_rbf,
-        rbf_functions.matern32_rbf,
+        #rbf_functions.matern32_rbf,
         #rbf_functions.matern52_rbf,
    ]:
         for seed in seeds:
@@ -94,8 +94,8 @@ def main():
 
             # RBF parameters
             n_inputs = 2  # (time, storage of Akosombo)
-            n_outputs = 3    #(irrigation and downstream release but with floods separated)
-            n_rbfs = 3      # how is this determined
+            n_outputs = 3    #(irrigation, downstream release, flood)
+            n_rbfs = 3      # how is this determined?
             rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs, rbf_function=entry)
 
             # Initialize model
@@ -106,18 +106,18 @@ def main():
             lowervolta_river.set_log(False)
 
             # Lower and Upper Bound for problem.types
-            epsilons = [0.5, 0.05, 0.05, 0.05, 0.001] #, 0.05]     #are these for each objective? 
+            epsilons = [0.5, 0.05, 0.05, 0.05, 0.001]    #epsilon precision for each objective 
             n_decision_vars = len(rbf.platypus_types)
 
             problem = Problem(n_decision_vars, n_objectives)
             problem.types[:] = rbf.platypus_types
             problem.function = lowervolta_river.evaluate
 
-            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower #***I see that all of these are maximize even though the env function should be minimized...
+            problem.directions[0] = Problem.MINIMIZE  # annual hydropower 
             problem.directions[1] = Problem.MAXIMIZE  # daily hydropower
             problem.directions[2] = Problem.MAXIMIZE  # irrigation
             problem.directions[3] = Problem.MAXIMIZE  # environment
-            problem.directions[4] = Problem.MINIMIZE  # flood events
+            problem.directions[4] = Problem.MAXIMIZE  # flood events
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
@@ -126,7 +126,7 @@ def main():
             with ProcessPoolEvaluator() as evaluator:
                 algorithm = EpsNSGAII(problem, epsilons=epsilons,
                                       evaluator=evaluator)
-                algorithm.run(500, track_progress) #original was 50000
+                algorithm.run(500, track_progress) #trial run #original is 50000
 
             store_results(algorithm, track_progress, 'output',
                           f"{entry.__name__}",
