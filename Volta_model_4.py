@@ -60,7 +60,7 @@ class VoltaModel:
         # historical record (1965- 2016) and 1000 year simulation horizon (using extended dataset)
         self.n_years = n_years # number of years of data
         self.time_horizon_H = self.n_days_in_year * self.n_years    #simulation horizon
-        self.hours_between_decisions = 24  # daily time step 
+        self.hours_between_decisions = 4  # daily time step 
         self.decisions_per_day = int(24 / self.hours_between_decisions)
         self.n_days_one_year = 365
         
@@ -127,19 +127,19 @@ class VoltaModel:
 
     def load_historic_data(self):   #ET, inflow, Akosombo tailwater, Kpong fixed head
         self.evap_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2/evapAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2_1year/evapAk_history.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo 1984-2012 (inches per day)
         self.inflow_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2/InflowAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2_1year/InflowAk_history.txt"),
             self.n_years, self.n_days_one_year
             )  # inflow, i.e. flows to Akosombo (cfs) 1984-2012     
         self.tailwater_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2/tailwaterAk_history.txt"), 
+            create_path("./Data/Historical_data/vectors2_1year/tailwaterAk_history.txt"), 
             self.n_years, self.n_days_one_year
             ) # historical tailwater level @ Akosombo (ft) 1984-2012
         self.fh_Kpong = utils.loadMultiVector(create_path(
-            "./Data/Historical_data/vectors2/fhKp_history.txt"),
+            "./Data/Historical_data/vectors2_1year/fhKp_history.txt"),
             self.n_years, self.n_days_one_year
             ) # historical fixed head @ Kpong (ft) 1984-2012  
         
@@ -248,7 +248,7 @@ class VoltaModel:
         
         # minimum discharge values for irrigation and downstream; and min level for flood releases
         qm_I = 0.0
-        qm_D = 0.0
+        qm_D = 5050.0 #0.0 # turbine flow corresponding to 6GWh for system stability
         
         # maximum discharge values (can be as much as the demand)
         qM_I = self.annual_irri[day_of_year]
@@ -318,7 +318,7 @@ class VoltaModel:
                      * (cubicFeetToCubicMeters * qturb)
                      * (feetToMeters * deltaH)
                      * 3600
-                     / 3600*pow(10, 9)  #conversion from Wh to GWh/h
+                     / 3600*pow(10, 9)  #conversion from Wh to GWh
                      )
                  pp.append(p)
              g_hyd.append(np.sum(np.asarray(pp)))
@@ -402,6 +402,7 @@ class VoltaModel:
             release_I[i] = rr[0]
             release_D[i] = rr[1]
             #print(release_D)
+            #print(release_I)
             
             #compute surface level, ET loss, head @Ak(reservoir level -tailwater level), fixedhead @Kp
             surface_Ak = self.level_to_surface(level_Ak[i])
@@ -469,20 +470,21 @@ class VoltaModel:
             if h_i >= h_target[tt]:
                 f = f + 1
         
-        G = 1 - (f / np.sum(h_i < h_target))
+        G = 1 - (f / 365)
         return G
     
-    #E-flows - Mazimization
+    #E-flows - Maximization
     def g_eflows_index(self, q, lTarget, uTarget):
+        delta = 24*3600
         e = 0
         for i, q_i in np.ndenumerate(q):
-            tt = i[0] %self.n_days_one_year
+            tt = i[0] % self.n_days_one_year
             while tt <= 90 or tt >= 305:
-                if lTarget[tt] <= q_i <= uTarget[tt]:
+                if ((lTarget[tt] * delta) > (q_i * delta)) or ((q_i * delta) > (uTarget[tt] * delta)):
                     e = e + 1
         
-        G = e / 150
-        return G    
+        G = 1 - (e / 150)
+        return G  
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
@@ -530,7 +532,6 @@ class VoltaModel:
 
         # release decision variables (irrigation) only
         # Downstream in Baseline
-        #input_variable_list_var = [0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]
         self.rbf.set_decision_vars(np.asarray(input_variable_list_var))
         #print(self.rbf.set_decision_vars(np.asarray(input_variable_list_var)))
 
@@ -553,6 +554,7 @@ class VoltaModel:
             print(day_of_year)
             if day_of_year%self.n_days_in_year == 0 and t !=0:
                 year = year + 1
+                #print(year)
                 
                 
             shape = (self.decisions_per_day +1,)
@@ -623,11 +625,12 @@ class VoltaModel:
             self.renv.append(release_d) 
             
         # compute objectives
-        j_hyd_a = sum(hydropowerProduction_Ak)/self.n_years # GWh/day need to figure out summation by years  # Maximization of annual hydropower 
-        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak)/self.n_years), self.annual_power) # Maximization of deviation from target of 4415GWh
-        j_hyd_d = hydropowerProduction_Ak #GWh/day #Maximisation (a simple maximization of daily hydropower. To do: 90 per cent reliability over the hydrological ensemble)
-        j_irri = self.g_vol_rel(release_i, self.annual_irri) #Maximization
-        j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) #Maximization
-        j_fldcntrl = self.g_flood_protectn_rel(level_ak, self.flood_protection) #Maximization
+        j_hyd_a = sum(hydropowerProduction_Ak)/self.n_years # GWh/year  # Maximization of annual hydropower 
+        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak)/self.n_years), self.annual_power) # Minization of deviation from target of 4415GWh
+        #j_hyd_d = hydropowerProduction_Ak #GWh/day  TO DO: 90 per cent reliability over the hydrological ensemble
+        j_irri = self.g_vol_rel(release_i, self.annual_irri) 
+        j_env = sum(release_d)/self.n_years #self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) 
+        j_fldcntrl = sum(level_ak)/self.n_years#self.g_flood_protectn_rel(level_ak, self.flood_protection) 
+        print(j_hyd_a)
         
-        return j_hyd_a, j_hyd_d, j_irri, j_env, j_fldcntrl
+        return j_hyd_a,  j_irri, j_env, j_fldcntrl #j_hyd_d,
