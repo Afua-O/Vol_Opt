@@ -303,7 +303,7 @@ class VoltaModel:
              deltaH = h[i] 
              q_split = r[i]     #cycling through turbines
              for j in range(0, Nturb):
-                 if q_split < 0:
+                 if q_split < turbines[1]: #turbine flow for system stability. if flow falls below this, the turbine is essentially shut off
                      qturb = 0.0
                  elif q_split > turbines[0]:
                      qturb = turbines[0]
@@ -318,7 +318,7 @@ class VoltaModel:
                      * (cubicFeetToCubicMeters * qturb)
                      * (feetToMeters * deltaH)
                      * 3600
-                     / (3600 * 1000)  
+                     / (3600 * 1000 * pow(10,6))  
                      )
                  pp.append(p)
              g_hyd.append(np.sum(np.asarray(pp)))
@@ -364,7 +364,7 @@ class VoltaModel:
                     * (cubicFeetToCubicMeters * qturb)
                     * (feetToMeters * deltaH)
                     * 3600
-                    / (3600 * 1000)
+                    / (3600 * 1000 * pow(10,6))
                     )
                 pp_K.append(p)
             g_hyd_Kp.append(np.sum(np.asarray(pp_K)))
@@ -413,7 +413,7 @@ class VoltaModel:
             
             #system transition
             storage_Ak[i +1] = storage_Ak[i] + sim_step *(
-                n_sim - evaporation_losses_Ak  - release_I[i]- 
+                n_sim - evaporation_losses_Ak  - 
                 release_D[i] - leak
                 )
             
@@ -447,7 +447,7 @@ class VoltaModel:
             )
         
         hp_kp = VoltaModel.g_hydKp(
-            np.asarray(release_D),
+            np.asarray(release_D - release_I),
             h_Kp,
             day_of_year,
             hour0,
@@ -473,7 +473,7 @@ class VoltaModel:
         G = 1 - (f / np.sum(h_target > 0))
         return G
     
-    #E-flows - Maximization
+    #E-flows - Maximization TO DO: 80% of the time is ok
     def g_eflows_index(self, q, lTarget, uTarget):
         delta = 24*3600
         e = 0
@@ -494,18 +494,29 @@ class VoltaModel:
         G = utils.computeMean(g)
         return G
     
-    """
-    #Annual hydropower - Maximization
-    def g_hydro_rel(self, p, pTarget):
-        p1 = [int(item) for item in p]
-        pTarget = np.tile(pTarget, int(len(p1) / self.n_days_one_year))
-        maxarr = (pTarget - p1)
-        maxarr[maxarr < 0] = 0 
-        gg = maxarr/pTarget #no penalty when hydropower is more
-        G = 1 / np.mean(np.square(gg))
-        return G   
-    """
     
+    #Annual hydropower - Maximization
+    #reshape (n_years, 365), aggregation by year (across row), store and compare to target
+    def g_hydro_rel(self, p, pTarget):
+        pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))
+        pTarget1 = np.reshape(pTarget,(self.n_years, self.n_days_one_year))
+        p1 = np.reshape(p, (self.n_years, self.n_days_one_year))
+        pTarget2 = np.sum(pTarget1, axis=1)
+        p2 = np.sum(p1, axis=1)
+        maxhyd = (pTarget2 - p2)
+        maxhyd[maxhyd < 0] = 0 #no penalty when hydropower is more than target
+        gg = maxhyd 
+        G = np.mean(np.square(gg))
+        return G   
+    
+    def g_hydro_max(self, p):
+        p1 = np.reshape(p, (self.n_years, self.n_days_one_year))
+        p2 = np.sum(p1, axis=1)
+        G = np.mean(p2)
+        return G
+        
+    
+    #Simulation
     #self.simulate(var, self.evap_Ak, self.inflow_Ak,
                          #self.tailwater_Ak, self.fh_Kpong, opt_met)
     def simulate(self, input_variable_list_var, inflow_Ak_n_sim, evap_Ak_e_ak, 
@@ -625,11 +636,10 @@ class VoltaModel:
             self.renv.append(release_d) 
             
         # compute objectives
-        j_hyd_a = sum(hydropowerProduction_Ak) / self.n_years / pow(10,6) # GWh/year  # Maximization of annual hydropower 
-        #j_hyd_a = self.g_hydro_rel((sum(hydropowerProduction_Ak)/self.n_years), self.annual_power) # Minization of deviation from target of 4415GWh
-        #j_hyd_d = hydropowerProduction_Ak #GWh/day  TO DO: 90 per cent reliability over the hydrological ensemble
+        #j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
+        j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
         j_irri = self.g_vol_rel(release_i, self.annual_irri) 
         j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) 
         j_fldcntrl = self.g_flood_protectn_rel(level_ak, self.flood_protection) 
         
-        return j_hyd_a,  j_irri, j_env, j_fldcntrl #j_hyd_d,
+        return j_hyd_a,  j_irri, j_env, j_fldcntrl 
