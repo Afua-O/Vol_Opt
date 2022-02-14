@@ -56,7 +56,7 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
             print("Creation of the directory failed")
 
 
-    header = ["annualhydropower", "dailyhydropower", "irrigation",
+    header = ["annualhydropower", "irrigation",
               "environment", "floodcontrol"]
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
@@ -94,29 +94,29 @@ def main():
             # RBF parameters
             n_inputs = 2  # (time, storage of Akosombo)
             n_outputs = 2    #(irrigation, downstream release)
-            n_rbfs = 4 #(n_inputs + 2)
+            n_rbfs = 4 #(n_inputs + 2)     
             rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs, rbf_function=entry)
 
             # Initialize model
-            n_objectives = 5
-            n_years = 29
+            n_objectives = 4
+            n_years = 1
 
             lowervolta_river = VoltaModel(265.0, 505.0, n_years, rbf)
             lowervolta_river.set_log(True)
 
             # Lower and Upper Bound for problem.types
-            epsilons = [0.5, 0.05, 0.05, 0.05, 0.001]    #epsilon precision for each objective 
+            epsilons = [0.5, 0.05, 0.05, 0.001]    #epsilon precision for each objective 
             n_decision_vars = len(rbf.platypus_types)
 
             problem = Problem(n_decision_vars, n_objectives)
             problem.types[:] = rbf.platypus_types
             problem.function = lowervolta_river.evaluate
 
-            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower 
-            problem.directions[1] = Problem.MAXIMIZE  # daily hydropower
-            problem.directions[2] = Problem.MAXIMIZE  # irrigation
-            problem.directions[3] = Problem.MAXIMIZE  # environment
-            problem.directions[4] = Problem.MAXIMIZE  # flood events
+            #problem.directions[0] = Problem.MAXIMIZE  # annual hydropower_max
+            problem.directions[0] = Problem.MINIMIZE  # annual hydropower_ deviation
+            problem.directions[1] = Problem.MAXIMIZE  # irrigation
+            problem.directions[2] = Problem.MAXIMIZE  # environment
+            problem.directions[3] = Problem.MAXIMIZE  # flood events
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
@@ -125,7 +125,7 @@ def main():
             with ProcessPoolEvaluator() as evaluator:
                 algorithm = EpsNSGAII(problem, epsilons=epsilons,
                                       evaluator=evaluator)
-                algorithm.run(50000, track_progress) #trial run #original is 50000
+                algorithm.run(200, track_progress) #trial run #original is 50000
 
             store_results(algorithm, track_progress, 'output',
                           f"{entry.__name__}",
