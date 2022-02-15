@@ -125,7 +125,7 @@ def main():
             with ProcessPoolEvaluator() as evaluator:
                 algorithm = EpsNSGAII(problem, epsilons=epsilons,
                                       evaluator=evaluator)
-                algorithm.run(1000, track_progress) #trial run #original is 50000
+                algorithm.run(200, track_progress) #trial run #original is 50000
 
             store_results(algorithm, track_progress, 'output',
                           f"{entry.__name__}",
