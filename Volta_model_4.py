@@ -65,8 +65,7 @@ class VoltaModel:
         self.n_days_one_year = 365
         
         # Constraints for the reservoirs
-        self.min_level_Akosombo = 240 # ft _ min level for hydropower generation and (assumed) min level for irrigation intakes
-        #self.spill_crest = 236  # ft _ spillway crest at Akosombo dam (#not really a constraint since its even lower than min level for turbines)
+        self.min_level_Akosombo = 240 # ft _ min level for hydropower generation 
         self.flood_warn_level = 276 #ft _ flood warning level where spilling starts (absolute max is 278ft)
         
         
@@ -96,13 +95,10 @@ class VoltaModel:
             self.evaluate = self.evaluate_mc
            
            
-        #Objective parameters  (#to be replaced with daily timeseries for a year)
+        #Objective parameters  
         self.annual_power = utils.loadVector(
             create_path("./Data/Objective_parameters/annual_power.txt"), self.n_days_one_year
         )   # annual hydropower target (GWh) (=4415GWh/year)
-        self.daily_power = utils.loadVector(
-            create_path("./Data/Objective_parameters/min_power.txt"), self.n_days_one_year
-        )   # minimum (firm) daily power requirement (GWh) (=6GWh/day)
         self.annual_irri = utils.loadVector(
             create_path("./Data/Objective_parameters/irrigation_demand.txt"), self.n_days_one_year
         )  # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
@@ -122,7 +118,6 @@ class VoltaModel:
         
         self.output_max.append(utils.computeMax(self.annual_irri))
         self.output_max.append(787416)
-        #self.output_max.append(utils.computeMax(self.flood_protection))
         # max release = total turbine capacity + spillways @ max storage (56616 + 730800= 787416 cfs) 
 
     def load_historic_data(self):   #ET, inflow, Akosombo tailwater, Kpong fixed head
@@ -174,7 +169,7 @@ class VoltaModel:
 
         
     def apply_rbf_policy(self, rbf_input):
-        # normalize inputs (divide input by maximum)
+        # normalize inputs 
         formatted_input = rbf_input / self.input_max
         #print(formatted_input)
         
@@ -182,7 +177,7 @@ class VoltaModel:
         normalized_output = self.rbf.apply_rbfs(formatted_input)
         #print(normalized_output)
         
-        # scale back normalized output (multiply output by maximum)
+        # scale back normalized output
         scaled_output = normalized_output * self.output_max #uu
         #print(scaled_output)
         
@@ -196,11 +191,11 @@ class VoltaModel:
                              self.tailwater_Ak, self.fh_Kpong, opt_met)
     
     def evaluate_mc(self, var, opt_met=1):
-        obj, Jhyd_a, Jhyd_d, Jirri, Jenv, Jflood = [], [], [], [], [], []       
+        obj, Jhyd, Jirri, Jenv, Jflood = [], [], [], [], [], []       
         # MC simulations
-        n_samples = 2       #historic and stochastic?
+        n_samples = 2       
         for i in range(0, n_samples):
-            Jhydropower_a, Jhydropower_d, Jirrigation, Jenvironment ,\
+            Jhydropower, Jirrigation, Jenvironment ,\
                 Jfloodcontrol = self.simulate(
                 var,
                 self.inflow_Ak,
@@ -209,25 +204,22 @@ class VoltaModel:
                 self.fh_Kpong,
                 opt_met,
             )
-            Jhyd_a.append(Jhydropower_a)
-            Jhyd_d.append(Jhydropower_d)
+            Jhyd.append(Jhydropower)
             Jirri.append(Jirrigation)
             Jenv.append(Jenvironment)
             Jflood.append(Jfloodcontrol)
             
 
         # objectives aggregation (minimax)
-        obj.insert(0, np.percentile(Jhyd_a, 99))
-        obj.insert(1, np.percentile(Jhyd_d, 99))
-        obj.insert(2, np.percentile(Jirri, 99))
-        obj.insert(3, np.percentile(Jenv, 99))
-        obj.insert(4, np.percentile(Jflood, 99))
+        obj.insert(0, np.percentile(Jhyd, 99))
+        obj.insert(1, np.percentile(Jirri, 99))
+        obj.insert(2, np.percentile(Jenv, 99))
+        obj.insert(3, np.percentile(Jflood, 99))
         return obj
     
     #convert storage at current timestep to level and then level to surface area
     def storage_to_level(self, s):
         # s : storage 
-        # gets triggered decision step * time horizon
         s_ = utils.cubicFeetToAcreFeet(s)
         h = utils.interpolate_linear(self.lsv_rel[2], self.lsv_rel[0], s_)
         return h
@@ -246,7 +238,7 @@ class VoltaModel:
         Tcap = 56616 # total turbine capacity at Akosombo(cfs)
         #maxSpill = 730800 # total spillway capacity (cfs)
         
-        # minimum discharge values for irrigation and downstream; and min level for flood releases
+        # minimum discharge values for irrigation and downstream
         qm_I = 0.0
         qm_D = 5050.0 #0.0 # turbine flow corresponding to 6GWh for system stability
         
@@ -495,7 +487,7 @@ class VoltaModel:
         return G
     
     
-    #Annual hydropower - Maximization
+    #Annual hydropower - Minimization of deviation
     #reshape (n_years, 365), aggregation by year (across row), store and compare to target
     def g_hydro_rel(self, p, pTarget):
         pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))
@@ -509,6 +501,7 @@ class VoltaModel:
         G = np.mean(np.square(gg))
         return G   
     
+    #Alternative hydropower- Maximization of hydropower generated
     def g_hydro_max(self, p):
         p1 = np.reshape(p, (self.n_years, self.n_days_one_year))
         p2 = np.sum(p1, axis=1)
@@ -535,7 +528,7 @@ class VoltaModel:
         shape = (self.time_horizon_H,)
         #print(shape)
         release_i = np.empty(shape) #irrigation
-        release_d = np.empty(shape) #downstream release (hydro, e-flows)
+        release_d = np.empty(shape) #downstream release (hydro, e-flows, floods)
         
         # hydropower production
         hydropowerProduction_Ak = []  # energy production at Akosombo
@@ -591,7 +584,7 @@ class VoltaModel:
                 
                 #compute decision
                 if opt_met == 0:# fixed release
-                    uu.append(uu[0])
+                    uu.append(uu[0]) #not used
                 elif opt_met == 1:# RBF-PSO
                     rbf_input = np.asarray([jj, daily_level_ak[j]])
                     uu = self.apply_rbf_policy(rbf_input)
