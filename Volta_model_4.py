@@ -463,7 +463,7 @@ class VoltaModel:
                 f = f + 1
         
         G = 1 - (f / np.sum(h_target > 0))
-        return G
+        return G #target value = 1
     
     #E-flows - Maximization TO DO: 80% of the time is ok
     def g_eflows_index(self, q, lTarget, uTarget):
@@ -473,10 +473,10 @@ class VoltaModel:
             tt = i[0] % self.n_days_one_year
             if ((lTarget[tt] * delta) > (q_i * delta)) or ((q_i * delta) > (uTarget[tt] * delta)):
                 e = e + 1
-                print (e)
+                print (e) 
         
         G = 1 - (e / np.sum(lTarget > 0))
-        return G  
+        return G  #target value = 1
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
@@ -484,7 +484,7 @@ class VoltaModel:
         qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year))
         g = (q * delta) / (qTarget * delta)
         G = utils.computeMean(g)
-        return G
+        return G #target value = 1
     
     
     #Annual hydropower - Minimization of deviation
@@ -499,14 +499,14 @@ class VoltaModel:
         maxhyd[maxhyd < 0] = 0 #no penalty when hydropower is more than target
         gg = maxhyd 
         G = np.mean(np.square(gg))
-        return G   
+        return G   #target value = 0
     
     #Alternative hydropower- Maximization of hydropower generated
     def g_hydro_max(self, p):
         p1 = np.reshape(p, (self.n_years, self.n_days_one_year))
         p2 = np.sum(p1, axis=1)
         G = np.mean(p2)
-        return G
+        return G #target value = max  hydropower possible (approx 1.038GW x24 x 365 =9093GWh)
         
     
     #Simulation
@@ -548,8 +548,6 @@ class VoltaModel:
         year = 0
         #print(decision_steps_per_year)
         
-        #for x in range (self.time_horizon_H):
-            #print(x)
         
         #runsimulation
         for t in range (self.time_horizon_H):
