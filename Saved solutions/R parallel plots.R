@@ -16,21 +16,19 @@ print(getwd())
 data <- read.csv("hydro_max2.csv", header= TRUE)
 head(data)
 
-ggparcoord(data,columns = 1:4, groupColumn = 5)
-
-
 #####
 ggparcoord(data=data,
-           columns = c(1:4), groupColumn = 5, #order = "anyClass",
-           scale= "uniminmax",
+           columns = c(1:4), groupColumn = 5, 
+           scale= "uniminmax", # for no scaling use "globalminmax"
            showPoints = TRUE, 
            title = "Trade-offs (Standardized to Min = 0 and Max = 1)",
            alphaLines = 1
 ) + 
-  scale_color_viridis(discrete=TRUE) +
+  scale_color_viridis(option = "b",discrete=TRUE) +
   theme_ipsum()+
   theme(
     legend.position="none",
-    plot.title = element_text(size=13)
+    plot.title = element_text(size=10)
   ) +
-  xlab("")
+  xlab("") +
+  ylab("Direction of preference →" )
