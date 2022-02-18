@@ -266,7 +266,8 @@ class VoltaModel:
         #actual release
         rr = []
         rr.append(min(qM_I, max(qm_I, uu[0])))
-        rr.append(min(qM_D, max(qm_D, uu[1])))
+        rr.append(min(qM_D, max(qm_D, uu[1], (min(qM_I, max(qm_I, uu[0])))))) 
+        #Release from Akosombo is max(release_D, release_I) subject to constraint on max flow through turbine
         return rr
         #print(rr)
 
@@ -473,10 +474,10 @@ class VoltaModel:
             tt = i[0] % self.n_days_one_year
             if ((lTarget[tt] * delta) > (q_i * delta)) or ((q_i * delta) > (uTarget[tt] * delta)):
                 e = e + 1
-                print (e) 
+                 
         
         G = 1 - (e / np.sum(lTarget > 0))
-        return G  #target value = 1
+        return G  #target value = 0.8
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
@@ -627,8 +628,8 @@ class VoltaModel:
             self.renv.append(release_d) 
             
         # compute objectives
-        #j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
-        j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
+        j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
+        #j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
         j_irri = self.g_vol_rel(release_i, self.annual_irri) 
         j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) 
         j_fldcntrl = self.g_flood_protectn_rel(level_ak, self.flood_protection) 
