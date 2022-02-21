@@ -51,12 +51,12 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
     path_name = f"{output_dir}/{rbf_name}"
     if not os.path.exists(path_name):
         try:
-            os.mkdir(path_name)
+            os.mkdir(path_name, exist_ok=True)
         except OSError:
             print("Creation of the directory failed")
 
 
-    header = ["annualhydropower", "irrigation",
+    header = ["hydropower", "irrigation",
               "environment", "floodcontrol"]
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
@@ -101,7 +101,7 @@ def main():
             n_objectives = 4
             n_years = 1
 
-            lowervolta_river = VoltaModel(265.0, 505.0, n_years, rbf)
+            lowervolta_river = VoltaModel(241.0, 505.0, n_years, rbf)
             lowervolta_river.set_log(True)
 
             # Lower and Upper Bound for problem.types
@@ -112,11 +112,12 @@ def main():
             problem.types[:] = rbf.platypus_types
             problem.function = lowervolta_river.evaluate
 
-            #problem.directions[0] = Problem.MAXIMIZE  # annual hydropower_max
-            problem.directions[0] = Problem.MINIMIZE  # annual hydropower_ deviation
+            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower_max
+            #problem.directions[0] = Problem.MINIMIZE  # annual hydropower_ deviation
             problem.directions[1] = Problem.MAXIMIZE  # irrigation
             problem.directions[2] = Problem.MAXIMIZE  # environment
-            problem.directions[3] = Problem.MAXIMIZE  # flood events
+            #problem.directions[3] = Problem.MAXIMIZE  # flood events (level)
+            problem.directions[3] = Problem.MINIMIZE  # flood events (flow release)
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
@@ -125,7 +126,7 @@ def main():
             with ProcessPoolEvaluator() as evaluator:
                 algorithm = EpsNSGAII(problem, epsilons=epsilons,
                                       evaluator=evaluator)
-                algorithm.run(200, track_progress) #trial run #original is 50000
+                algorithm.run(200, track_progress) #trial run #should be 50000
 
             store_results(algorithm, track_progress, 'output',
                           f"{entry.__name__}",
