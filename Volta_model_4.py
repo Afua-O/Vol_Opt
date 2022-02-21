@@ -103,8 +103,9 @@ class VoltaModel:
             create_path("./Data/Objective_parameters/irrigation_demand.txt"), self.n_days_one_year
         )  # annual irrigation demand (cfs) (=38m3/s rounded to whole number)
         self.flood_protection = utils.loadVector(
-            create_path("./Data/Objective_parameters/h_flood.txt"), self.n_days_one_year
-        )  # reservoir level above which spilling is triggered (ft) (276ft)
+            create_path("./Data/Objective_parameters/q_flood.txt"), self.n_days_one_year
+        )  # h_flood:reservoir level above which spilling is triggered (ft) (276ft)
+           # q_flood: flow release above which flooding occurs (cfs) (81233cfs = 2300m3/s)
         self.clam_eflows_l = utils.loadVector(
             create_path("./Data/Objective_parameters/l_eflows.txt"), self.n_days_one_year
         )  # lower bound of of e-flow required in November to March (cfs) (=50 m3/s)
@@ -455,8 +456,8 @@ class VoltaModel:
     
     #OBJECTIVE FUNCTIONS
     
-    #Flood protection - Maximization
-    def g_flood_protectn_rel(self, h, h_target):
+    #Flood protection (Ak level <276- h_flood objective) - Maximization
+    def h_flood_protectn_rel(self, h, h_target):
         f=0
         for i, h_i in np.ndenumerate(h):
             tt = i[0] % self.n_days_one_year
@@ -466,7 +467,18 @@ class VoltaModel:
         G = 1 - (f / np.sum(h_target > 0))
         return G #target value = 1
     
-    #E-flows - Maximization TO DO: 80% of the time is ok
+    #Flood protection (Ak release < 2300m3/s- q_flood objective) -Minimization
+    def q_flood_protectn_rel(self, q1, qTarget):
+        delta = 24 * 3600
+        qTarget = np.tile(qTarget, int(len(q1) / self.n_days_one_year))
+        maxarr = (q1 * delta) - (qTarget * delta)
+        maxarr[maxarr < 0] = 0
+        gg = maxarr / (qTarget * delta)
+        g = np.mean(np.square(gg))
+        return g #target value = 0
+        
+    
+    #E-flows - Maximization 
     def g_eflows_index(self, q, lTarget, uTarget):
         delta = 24*3600
         e = 0
@@ -630,8 +642,9 @@ class VoltaModel:
         # compute objectives
         j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
         #j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
-        j_irri = self.g_vol_rel(release_i, self.annual_irri) 
-        j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) 
-        j_fldcntrl = self.g_flood_protectn_rel(level_ak, self.flood_protection) 
+        j_irri = self.g_vol_rel(release_i, self.annual_irri) #Maximisation
+        j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) #Maximisation
+        #j_fldcntrl = self.h_flood_protectn_rel(level_ak, self.flood_protection) # Maximization
+        j_fldcntrl = self.q_flood_protectn_rel(release_d, self.flood_protection) #Minimization
         
         return j_hyd_a,  j_irri, j_env, j_fldcntrl 
