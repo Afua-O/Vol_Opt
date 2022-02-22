@@ -112,6 +112,13 @@ class VoltaModel:
         self.clam_eflows_u = utils.loadVector(
             create_path("./Data/Objective_parameters/u_eflows.txt"), self.n_days_one_year
         )  # upper bound of of e-flow required in November to March (cfs) (=330 m3/s)
+        self.eflows2 = utils.loadVector(
+            create_path("./Data/Objective_parameters/eflows2.txt"), self.n_days_one_year
+        ) # e-flows scenario with 2300m3/s in Sept-Oct and 700m3/s rest of the year
+        self.eflows3 = utils.loadVector(
+            create_path("./Data/Objective_parameters/eflows2.txt"), self.n_days_one_year
+        ) # e-flows scenario with 3000m3/s in Sept-Oct and 500m3/s rest of the year
+        
         
         # standardization of the input-output of the RBF release curve      
         self.input_max.append(self.n_days_in_year * self.decisions_per_day - 1) #max number of inputs
@@ -456,7 +463,7 @@ class VoltaModel:
     
     #OBJECTIVE FUNCTIONS
     
-    #Flood protection (Ak level <276- h_flood objective) - Maximization
+    #Flood protection (Ak level < 276- h_flood objective) - Maximization # not used
     def h_flood_protectn_rel(self, h, h_target):
         f=0
         for i, h_i in np.ndenumerate(h):
@@ -478,18 +485,29 @@ class VoltaModel:
         return g #target value = 0
         
     
-    #E-flows - Maximization 
+    #Clam E-flows - Maximization 
     def g_eflows_index(self, q, lTarget, uTarget):
         delta = 24*3600
         e = 0
         for i, q_i in np.ndenumerate(q):
             tt = i[0] % self.n_days_one_year
             if ((lTarget[tt] * delta) > (q_i * delta)) or ((q_i * delta) > (uTarget[tt] * delta)):
-                e = e + 1
-                 
+                e = e + 1          
         
         G = 1 - (e / np.sum(lTarget > 0))
         return G  #target value = 0.8
+    
+    #E-flows 2 and 3-  Maximization
+    def g_eflows_index2(self, q, q_target):
+        f=0
+        delta = 24 * 3600
+        for i, q_i in np.ndenumerate(q):
+            tt = i[0] % self.n_days_one_year
+            if (q_i * delta) >= (q_target[tt] * delta):
+                f = f + 1
+        
+        G = 1 - (f / np.sum(q_target > 0))
+        return G #target value = 1
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
@@ -500,7 +518,7 @@ class VoltaModel:
         return G #target value = 1
     
     
-    #Annual hydropower - Minimization of deviation
+    #Annual hydropower - Minimization of deviation #not used
     #reshape (n_years, 365), aggregation by year (across row), store and compare to target
     def g_hydro_rel(self, p, pTarget):
         pTarget = np.tile(pTarget, int(len(p) / self.n_days_one_year))
@@ -514,7 +532,7 @@ class VoltaModel:
         G = np.mean(np.square(gg))
         return G   #target value = 0
     
-    #Alternative hydropower- Maximization of hydropower generated
+    #Hydropower- Maximization of hydropower generated
     def g_hydro_max(self, p):
         p1 = np.reshape(p, (self.n_years, self.n_days_one_year))
         p2 = np.sum(p1, axis=1)
@@ -643,8 +661,10 @@ class VoltaModel:
         j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
         #j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
         j_irri = self.g_vol_rel(release_i, self.annual_irri) #Maximisation
-        j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) #Maximisation
+        j_env = self.g_eflows_index((release_d-release_i), self.clam_eflows_l, self.clam_eflows_u) #Maximisation
+        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows2) #Maximisation
+        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows3) #Maximisation                             
         #j_fldcntrl = self.h_flood_protectn_rel(level_ak, self.flood_protection) # Maximization
-        j_fldcntrl = self.q_flood_protectn_rel(release_d, self.flood_protection) #Minimization
+        j_fldcntrl = self.q_flood_protectn_rel((release_d-release_i), self.flood_protection) #Minimization
         
         return j_hyd_a,  j_irri, j_env, j_fldcntrl 
