@@ -56,7 +56,7 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
             print("Creation of the directory failed")
 
 
-    header = ["dailyhydropower", "irrigation"]
+    header = ["hydropower", "irrigation", 'floodcontrol']
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
         writer = csv.writer(f)
@@ -98,14 +98,14 @@ def main():
             rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs, rbf_function=entry)
 
             # Initialize model
-            n_objectives = 2
+            n_objectives = 3
             n_years = 1
 
             lowervolta_river = VoltaModel(241.0, 505.0, n_years, rbf)
             lowervolta_river.set_log(True)
 
             # Lower and Upper Bound for problem.types
-            epsilons = [0.5, 0.05]    #epsilon precision for each objective 
+            epsilons = [0.5, 0.05, 0.05]    #epsilon precision for each objective 
             n_decision_vars = len(rbf.platypus_types)
 
             problem = Problem(n_decision_vars, n_objectives)
@@ -116,7 +116,7 @@ def main():
             problem.directions[0] = Problem.MINIMIZE  # daily hydropower_ deviation
             problem.directions[1] = Problem.MAXIMIZE  # irrigation
             #problem.directions[2] = Problem.MAXIMIZE  # environment
-            #problem.directions[3] = Problem.MAXIMIZE  # flood events
+            problem.directions[2] = Problem.MINIMIZE #flood events (flow release)
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
