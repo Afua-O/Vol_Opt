@@ -19,7 +19,7 @@ import pandas as pd
 import random
 
 #pip install platypus
-from platypus-opt import Problem, EpsNSGAII, Real, ProcessPoolEvaluator
+from platypus import Problem, EpsNSGAII, Real, ProcessPoolEvaluator
 
 import rbf_functions
 from Volta_model_4 import VoltaModel
