@@ -18,7 +18,7 @@ import os
 import pandas as pd
 import random
 
-#pip install platypus
+#pip install platypus-opt
 from platypus import Problem, EpsNSGAII, Real, ProcessPoolEvaluator
 
 import rbf_functions
@@ -51,13 +51,13 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
     path_name = f"{output_dir}/{rbf_name}"
     if not os.path.exists(path_name):
         try:
-            os.mkdir(path_name, exist_ok=True)
+            os.mkdir(path_name)#, exist_ok=True)
         except OSError:
             print("Creation of the directory failed")
 
 
     header = ["hydropower", "irrigation",
-              "environment", "floodcontrol"]
+               "environment","floodcontrol"]
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
         writer = csv.writer(f)
@@ -78,7 +78,7 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
 
 
 def main():
-    seeds = [10] #, 20, 30, 40, 50, 60, 70, 80, 90, 100] 
+    seeds = [10] #, 20, 30, 40, 50, 60, 70, 80, 90, 100] #Initial run # at least 5 seeds
     for entry in [
                   #rbf_functions.original_rbf,
         rbf_functions.squared_exponential_rbf,
@@ -105,7 +105,7 @@ def main():
             lowervolta_river.set_log(True)
 
             # Lower and Upper Bound for problem.types
-            epsilons = [0.5, 0.05, 0.05, 0.001]    #epsilon precision for each objective 
+            epsilons = [0.5, 0.05, 0.01, 0.05]    #epsilon precision for each objective 
             n_decision_vars = len(rbf.platypus_types)
 
             problem = Problem(n_decision_vars, n_objectives)
