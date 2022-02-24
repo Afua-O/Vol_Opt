@@ -130,19 +130,19 @@ class VoltaModel:
 
     def load_historic_data(self):   #ET, inflow, Akosombo tailwater, Kpong fixed head
         self.evap_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2_1year/evapAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2/evapAk_history.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo 1984-2012 (inches per day)
         self.inflow_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2_1year/InflowAk_history.txt"),
+            create_path("./Data/Historical_data/vectors2/InflowAk_history.txt"),
             self.n_years, self.n_days_one_year
             )  # inflow, i.e. flows to Akosombo (cfs) 1984-2012     
         self.tailwater_Ak = utils.loadMultiVector(
-            create_path("./Data/Historical_data/vectors2_1year/tailwaterAk_history.txt"), 
+            create_path("./Data/Historical_data/vectors2/tailwaterAk_history.txt"), 
             self.n_years, self.n_days_one_year
             ) # historical tailwater level @ Akosombo (ft) 1984-2012
         self.fh_Kpong = utils.loadMultiVector(create_path(
-            "./Data/Historical_data/vectors2_1year/fhKp_history.txt"),
+            "./Data/Historical_data/vectors2/fhKp_history.txt"),
             self.n_years, self.n_days_one_year
             ) # historical fixed head @ Kpong (ft) 1984-2012  
         
@@ -248,7 +248,7 @@ class VoltaModel:
         
         # minimum discharge values for irrigation and downstream
         qm_I = 0.0
-        qm_D = 5050.0 #0.0 # turbine flow corresponding to 6GWh for system stability
+        qm_D = 5050 #  turbine flow corresponding to 6GWh for system stability 5050 cfs
         
         # maximum discharge values (can be as much as the demand)
         qM_I = self.annual_irri[day_of_year]
@@ -428,7 +428,7 @@ class VoltaModel:
         #print uu to see both rel_i and rel_d clearly (daily releases)
         
         level_Ak = np.asarray(level_Ak) #h
-        print("water level = ", utils.computeMean(level_Ak)) #daily water level
+        #print("water level = ", utils.computeMean(level_Ak)) #daily water level
         h_Ak = np.asarray(np.tile(h_Ak, int(len(level_Ak))))
         #print(h_Ak)
         h_Kp = np.asarray(np.tile(h_Kp, int(len(level_Ak))))
@@ -462,18 +462,7 @@ class VoltaModel:
     
     
     #OBJECTIVE FUNCTIONS
-    
-    #Flood protection (Ak level < 276- h_flood objective) - Maximization # not used
-    def h_flood_protectn_rel(self, h, h_target):
-        f=0
-        for i, h_i in np.ndenumerate(h):
-            tt = i[0] % self.n_days_one_year
-            if h_i >= h_target[tt]:
-                f = f + 1
         
-        G = 1 - (f / np.sum(h_target > 0))
-        return G #target value = 1
-    
     #Flood protection (Ak release < 2300m3/s- q_flood objective) -Minimization
     def q_flood_protectn_rel(self, q1, qTarget):
         delta = 24 * 3600
@@ -495,7 +484,7 @@ class VoltaModel:
                 e = e + 1          
         
         G = 1 - (e / np.sum(lTarget > 0))
-        return G  #target value = 0.8
+        return G  #target value = 1
     
     #E-flows 2 and 3-  Maximization
     def g_eflows_index2(self, q, q_target):
@@ -584,7 +573,7 @@ class VoltaModel:
         for t in range (self.time_horizon_H):
             #print(t)
             day_of_year = t % self.n_days_in_year
-            print("day # ", day_of_year)
+            #print("day # ", day_of_year)
             if day_of_year%self.n_days_in_year == 0 and t !=0:
                 year = year + 1
                 #print(year)
@@ -618,7 +607,7 @@ class VoltaModel:
                     rbf_input = np.asarray([jj, daily_level_ak[j]])
                     uu = self.apply_rbf_policy(rbf_input)
                     #print(rbf_input)
-                    print(uu)
+                    #print(uu)
                 
                 #def res_transition_h(self, s0, uu, n_sim, ev, day_of_year, hour0)
                 #system transition
@@ -663,8 +652,7 @@ class VoltaModel:
         j_irri = self.g_vol_rel(release_i, self.annual_irri) #Maximisation
         j_env = self.g_eflows_index((release_d-release_i), self.clam_eflows_l, self.clam_eflows_u) #Maximisation
         #j_env = self.g_eflows_index2((release_d-release_i), self.eflows2) #Maximisation
-        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows3) #Maximisation                             
-        #j_fldcntrl = self.h_flood_protectn_rel(level_ak, self.flood_protection) # Maximization
+        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows3) #Maximisation
         j_fldcntrl = self.q_flood_protectn_rel((release_d-release_i), self.flood_protection) #Minimization
         
         return j_hyd_a,  j_irri, j_env, j_fldcntrl 
