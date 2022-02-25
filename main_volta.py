@@ -116,7 +116,6 @@ def main():
             #problem.directions[0] = Problem.MINIMIZE  # annual hydropower_ deviation
             problem.directions[1] = Problem.MAXIMIZE  # irrigation
             problem.directions[2] = Problem.MAXIMIZE  # environment
-            #problem.directions[3] = Problem.MAXIMIZE  # flood events (level)
             problem.directions[3] = Problem.MINIMIZE  # flood events (flow release)
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
