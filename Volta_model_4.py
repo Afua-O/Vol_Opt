@@ -147,21 +147,21 @@ class VoltaModel:
             ) # historical fixed head @ Kpong (ft) 1984-2012  
         
         
-    def load_stochastic_data(self):   # stochastic hydrology###   no stochastic data yet
+    def load_stochastic_data(self):   # historical data in matrix format
         self.evap_Ak = utils.loadMatrix(
-            create_path("./Data/Stochastic_data/Akosombo_ET_stochastic.txt"),
+            create_path("./Data/Historical_data/matrix/evapAk_history.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo_ stochastic data (inches per day)
         self.inflow_Ak = utils.loadMatrix(
-            create_path("./Data/Stochastic_data/Inflow(cfs)_to_Akosombo_stochastic.txt"),
+            create_path("./Data/Historical_data/matrix/InflowAk_history.txt"),
             self.n_years, self.n_days_one_year
         )  # inflow, i.e. flows to Akosombo_stochastic data     
         self.tailwater_Ak = utils.loadMatrix(
-            create_path("./Data/Stochastic_data/3.Tailwater/tailwater_Ak.txt"), 
+            create_path("./Data/Historical_data/matrix/tailwaterAk_history.txt"), 
             self.n_years, self.n_days_one_year
             ) # tailwater level @ Akosombo (ft) 
         self.fh_Kpong = utils.loadMatrix(
-            create_path("./Data/Stochastic_datas/1.Fixed_head/fh_Kpong.txt"),
+            create_path("./Data/Historical_data/matrix/fhKp_history.txt"),
             self.n_years, self.n_days_one_year
             ) # fixed head Kpong (ft)
         
