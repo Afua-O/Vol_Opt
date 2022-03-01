@@ -27,7 +27,7 @@ class VoltaModel:
     n_days_in_year = 365 #days in a year
     
     #initial conditions
-    def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=True):
+    def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=False):
         """
 
         Parameters
@@ -38,6 +38,9 @@ class VoltaModel:
         rbf : callable
         historic_data : bool, optional; if true use historic data, 
                         if false use stochastic data
+        NB: historic_data =True is set up for 1 year of data, for multiple years 
+         set  historic_data = False to use stochastic model which can take 
+         multiple years
         """
 
         self.init_level = l0_Akosombo  # initial water level @ start of simulation_ feet
@@ -196,12 +199,12 @@ class VoltaModel:
     
     def evaluate_historic(self, var, opt_met=1):
         return self.simulate(var, self.inflow_Ak, self.evap_Ak, 
-                             self.tailwater_Ak, self.fh_Kpong, opt_met)
+                             self.tailwater_Ak, self.fh_Kpong, opt_met) #for running 1 year of data
     
     def evaluate_mc(self, var, opt_met=1):
-        obj, Jhyd, Jirri, Jenv, Jflood = [], [], [], [], [], []       
+        obj, Jhyd, Jirri, Jenv, Jflood = [], [], [], [], []      
         # MC simulations
-        n_samples = 2       
+        n_samples = self.n_years        
         for i in range(0, n_samples):
             Jhydropower, Jirrigation, Jenvironment ,\
                 Jfloodcontrol = self.simulate(
@@ -218,11 +221,11 @@ class VoltaModel:
             Jflood.append(Jfloodcontrol)
             
 
-        # objectives aggregation (minimax)
-        obj.insert(0, np.percentile(Jhyd, 99))
-        obj.insert(1, np.percentile(Jirri, 99))
-        obj.insert(2, np.percentile(Jenv, 99))
-        obj.insert(3, np.percentile(Jflood, 99))
+        # objectives aggregation (worst case formulation: for obj that are maximised, insert minimum of the 29 years and vice versa)
+        obj.insert(0, np.min(Jhyd))
+        obj.insert(1, np.min(Jirri))
+        obj.insert(2, np.min(Jenv))
+        obj.insert(3, np.max(Jflood))
         return obj
     
     #convert storage at current timestep to level and then level to surface area
@@ -569,14 +572,14 @@ class VoltaModel:
         #print(decision_steps_per_year)
         
         
-        #runsimulation
+        #run simulation
         for t in range (self.time_horizon_H):
             #print(t)
             day_of_year = t % self.n_days_in_year
             #print("day # ", day_of_year)
             if day_of_year%self.n_days_in_year == 0 and t !=0:
                 year = year + 1
-                #print(year)
+                #print("year# ", year)
                 
                 
             shape = (self.decisions_per_day +1,)
