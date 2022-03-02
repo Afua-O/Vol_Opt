@@ -27,7 +27,7 @@ class VoltaModel:
     n_days_in_year = 365 #days in a year
     
     #initial conditions
-    def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=False):
+    def __init__(self, l0_Akosombo, d0, n_years, rbf, historic_data=True):
         """
 
         Parameters
@@ -38,9 +38,6 @@ class VoltaModel:
         rbf : callable
         historic_data : bool, optional; if true use historic data, 
                         if false use stochastic data
-        NB: historic_data =True is set up for 1 year of data, for multiple years 
-         set  historic_data = False to use stochastic model which can take 
-         multiple years
         """
 
         self.init_level = l0_Akosombo  # initial water level @ start of simulation_ feet
@@ -151,19 +148,19 @@ class VoltaModel:
         
         
     def load_stochastic_data(self):   # historical data in matrix format
-        self.evap_Ak = utils.loadMatrix(
+        self.evap_Ak = utils.loadArrangeMatrix(
             create_path("./Data/Historical_data/matrix/evapAk_history.txt"),
             self.n_years, self.n_days_one_year
             ) #evaporation losses @ Akosombo_ stochastic data (inches per day)
-        self.inflow_Ak = utils.loadMatrix(
+        self.inflow_Ak = utils.loadArrangeMatrix(
             create_path("./Data/Historical_data/matrix/InflowAk_history.txt"),
             self.n_years, self.n_days_one_year
         )  # inflow, i.e. flows to Akosombo_stochastic data     
-        self.tailwater_Ak = utils.loadMatrix(
+        self.tailwater_Ak = utils.loadArrangeMatrix(
             create_path("./Data/Historical_data/matrix/tailwaterAk_history.txt"), 
             self.n_years, self.n_days_one_year
             ) # tailwater level @ Akosombo (ft) 
-        self.fh_Kpong = utils.loadMatrix(
+        self.fh_Kpong = utils.loadArrangeMatrix(
             create_path("./Data/Historical_data/matrix/fhKp_history.txt"),
             self.n_years, self.n_days_one_year
             ) # fixed head Kpong (ft)
@@ -221,11 +218,19 @@ class VoltaModel:
             Jflood.append(Jfloodcontrol)
             
 
-        # objectives aggregation (worst case formulation: for obj that are maximised, insert minimum of the 29 years and vice versa)
-        obj.insert(0, np.min(Jhyd))
-        obj.insert(1, np.min(Jirri))
-        obj.insert(2, np.min(Jenv))
-        obj.insert(3, np.max(Jflood))
+        # objectives aggregation 
+        #(worst case/robust formulation: for obj that are maximised, insert minimum of the 29 years and vice versa)
+        #obj.insert(0, np.min(Jhyd))
+        #obj.insert(1, np.min(Jirri))
+        #obj.insert(2, np.min(Jenv))
+        #obj.insert(3, np.max(Jflood))
+        
+        #(average performance formulation: insert x-percentile of the 29 years)
+        obj.insert(0, np.percentile(Jhyd, 80))
+        obj.insert(1, np.percentile(Jirri, 80))
+        obj.insert(2, np.percentile(Jenv, 80))
+        obj.insert(3, np.percentile(Jflood, 80))
+        
         return obj
     
     #convert storage at current timestep to level and then level to surface area
@@ -251,7 +256,7 @@ class VoltaModel:
         
         # minimum discharge values for irrigation and downstream
         qm_I = 0.0
-        qm_D = 5050 #  turbine flow corresponding to 6GWh for system stability 5050 cfs
+        qm_D = 0.0 #  turbine flow corresponding to 6GWh for system stability 5050 cfs
         
         # maximum discharge values (can be as much as the demand)
         qM_I = self.annual_irri[day_of_year]
@@ -273,14 +278,15 @@ class VoltaModel:
             qm_D = (utils.interpolate_linear(self.spillways[0],
                                              self.spillways[1], 
                                              level_Ak)) +Tcap
+    
             
         #actual release
         rr = []
         rr.append(min(qM_I, max(qm_I, uu[0])))
-        rr.append(min(qM_D, max(qm_D, uu[1], (min(qM_I, max(qm_I, uu[0])))))) 
+        rr.append(min(qM_D, max(qm_D, uu[1], (min(qM_I, max(qm_I, uu[0]))) )))
         #Release from Akosombo is max(release_D, release_I) subject to constraint on max flow through turbine
-        return rr
         #print(rr)
+        return rr
 
         
     @staticmethod
@@ -427,10 +433,11 @@ class VoltaModel:
         sto_ak = storage_Ak[HH]
         #print(sto_ak)
         rel_i = utils.computeMean(release_I)
+        #print(rel_i)
         rel_d = utils.computeMean(release_D)
-        #print uu to see both rel_i and rel_d clearly (daily releases)
+        #print(rel_d)
         
-        level_Ak = np.asarray(level_Ak) #h
+        level_Ak = np.asarray(level_Ak) 
         #print("water level = ", utils.computeMean(level_Ak)) #daily water level
         h_Ak = np.asarray(np.tile(h_Ak, int(len(level_Ak))))
         #print(h_Ak)
@@ -503,10 +510,10 @@ class VoltaModel:
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
-        delta = 24 * 3600
         qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year))
-        g = (q * delta) / (qTarget * delta)
+        g = q  / qTarget 
         G = utils.computeMean(g)
+        #print(q)
         return G #target value = 1
     
     
@@ -590,13 +597,15 @@ class VoltaModel:
             daily_release_i = np.empty(shape)
             daily_release_d = np.empty(shape)
             
-            #initialization of sub-daily cycle
-            daily_level_ak[0] = level_ak[t]
-            daily_storage_ak[0] = storage_ak[t]
+            #initialization of sub-daily cycle 
+            daily_level_ak[0] = level_ak[day_of_year] 
+            #print("daily level = ", daily_level_ak)
+            daily_storage_ak[0] = storage_ak[day_of_year]
+            #print("daily storage = ",daily_storage_ak)
             
             # sub-daily cycle #incase subdaily optimisation is done later
             for j in range (self.decisions_per_day):
-                decision_step = (t * self.decisions_per_day) + j
+                decision_step = (day_of_year * self.decisions_per_day) + j
                 #print (j)
                 
                 # decision step i in a year
@@ -626,10 +635,13 @@ class VoltaModel:
                     )
                 
                 daily_storage_ak[j+1] = ss_rr_hp[0]
+                #print(daily_storage_ak)
                 daily_level_ak[j+1] = self.storage_to_level(daily_storage_ak[j+1])
-                
+                #print(daily_level_ak)
                 daily_release_i[j] = ss_rr_hp[1]
+                #print("rel i= ", daily_release_i)
                 daily_release_d[j] = ss_rr_hp[2]
+                #print("rel d= ", daily_release_d)
                 
                 #Hydropower production
                 hydropowerProduction_Ak.append(
@@ -638,10 +650,13 @@ class VoltaModel:
                     ss_rr_hp[4])# daily energy production (GWh/day) at Kpong
                 
             #daily values
-            level_ak[day_of_year + 1] = daily_level_ak[self.decisions_per_day] #ft
+            level_ak[t + 1] = daily_level_ak[self.decisions_per_day] #ft
             storage_ak[t + 1] = daily_storage_ak[self.decisions_per_day] 
-            release_i[day_of_year] = np.mean(daily_release_i) #cfs
-            release_d[day_of_year] = np.mean(daily_release_d) #cfs
+            release_i[t] = np.mean(daily_release_i) #cfs
+            release_d[t] = np.mean(daily_release_d) #cfs
+            #print("release_i= ", release_i)
+            #print("release_d= ", release_d)
+            
             
         #log level / release
         if self.log_objectives:
@@ -658,4 +673,5 @@ class VoltaModel:
         #j_env = self.g_eflows_index2((release_d-release_i), self.eflows3) #Maximisation
         j_fldcntrl = self.q_flood_protectn_rel((release_d-release_i), self.flood_protection) #Minimization
         
+        #print(j_irri)
         return j_hyd_a,  j_irri, j_env, j_fldcntrl 
