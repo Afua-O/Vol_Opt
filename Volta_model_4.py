@@ -256,7 +256,7 @@ class VoltaModel:
         
         # minimum discharge values for irrigation and downstream
         qm_I = 0.0
-        qm_D = 0.0 #  turbine flow corresponding to 6GWh for system stability 5050 cfs
+        qm_D = 5050.0 #  turbine flow corresponding to 6GWh for system stability 5050 cfs
         
         # maximum discharge values (can be as much as the demand)
         qM_I = self.annual_irri[day_of_year]
@@ -493,7 +493,7 @@ class VoltaModel:
             if ((lTarget[tt] * delta) > (q_i * delta)) or ((q_i * delta) > (uTarget[tt] * delta)):
                 e = e + 1          
         
-        G = 1 - (e / np.sum(lTarget > 0))
+        G = 1 - (e / (self.n_years * np.sum(lTarget > 0)))
         return G  #target value = 1
     
     #E-flows 2 and 3-  Maximization
@@ -505,13 +505,14 @@ class VoltaModel:
             if (q_i * delta) >= (q_target[tt] * delta):
                 f = f + 1
         
-        G = 1 - (f / np.sum(q_target > 0))
+        G = 1 - (f / (self.n_years * np.sum(q_target > 0)))
         return G #target value = 1
     
     #Irrigation - Maximization
     def g_vol_rel(self, q, qTarget):
+        delta = 24 * 3600
         qTarget = np.tile(qTarget, int(len(q) / self.n_days_one_year))
-        g = q  / qTarget 
+        g = (q * delta)  / (qTarget * delta )
         G = utils.computeMean(g)
         #print(q)
         return G #target value = 1
