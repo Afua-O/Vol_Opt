@@ -201,7 +201,7 @@ class VoltaModel:
     def evaluate_mc(self, var, opt_met=1):
         obj, Jhyd, Jirri, Jenv, Jflood = [], [], [], [], []      
         # MC simulations
-        n_samples = self.n_years        
+        n_samples = 1        
         for i in range(0, n_samples):
             Jhydropower, Jirrigation, Jenvironment ,\
                 Jfloodcontrol = self.simulate(
@@ -225,11 +225,11 @@ class VoltaModel:
         #obj.insert(2, np.min(Jenv))
         #obj.insert(3, np.max(Jflood))
         
-        #(average performance formulation: insert x-percentile of the 29 years)
-        obj.insert(0, np.percentile(Jhyd, 80))
-        obj.insert(1, np.percentile(Jirri, 80))
-        obj.insert(2, np.percentile(Jenv, 80))
-        obj.insert(3, np.percentile(Jflood, 80))
+        #(90% reliability formulation: insert x-percentile of the 29 years)
+        obj.insert(0, np.percentile(Jhyd, 90))
+        obj.insert(1, np.percentile(Jirri, 90))
+        obj.insert(2, np.percentile(Jenv, 90))
+        obj.insert(3, np.percentile(Jflood, 90))
         
         return obj
     
@@ -283,9 +283,8 @@ class VoltaModel:
         #actual release
         rr = []
         rr.append(min(qM_I, max(qm_I, uu[0])))
-        rr.append(min(qM_D, max(qm_D, uu[1], (min(qM_I, max(qm_I, uu[0]))) )))
-        #Release from Akosombo is max(release_D, release_I) subject to constraint on max flow through turbine
-        #print(rr)
+        rr.append(min(qM_D, max(qm_D, uu[1])))
+        print(rr)
         return rr
 
         
@@ -424,7 +423,7 @@ class VoltaModel:
             #system transition
             storage_Ak[i +1] = storage_Ak[i] + sim_step *(
                 n_sim - evaporation_losses_Ak  - 
-                release_D[i] - leak
+                release_D[i] - release_I[i] - leak
                 )
             
             c_hour = c_hour + 1
@@ -448,7 +447,7 @@ class VoltaModel:
         
         #decision timestep
         hp = VoltaModel.g_hydAk(
-            np.asarray(release_D),
+            np.asarray(release_D + release_I),
             h_Ak,
             day_of_year,
             hour0,
@@ -458,7 +457,7 @@ class VoltaModel:
             )
         
         hp_kp = VoltaModel.g_hydKp(
-            np.asarray(release_D - release_I),
+            np.asarray(release_D),
             h_Kp,
             day_of_year,
             hour0,
@@ -666,13 +665,14 @@ class VoltaModel:
             self.renv.append(release_d) 
             
         # compute objectives
-        j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower 
+        j_hyd_a = self.g_hydro_max(hydropowerProduction_Ak) # GWh/year  # Maximization of annual hydropower- Akosombo
         #j_hyd_a = self.g_hydro_rel(hydropowerProduction_Ak, self.annual_power) # Minimization of deviation from target of 4415GWh
         j_irri = self.g_vol_rel(release_i, self.annual_irri) #Maximisation
-        j_env = self.g_eflows_index((release_d-release_i), self.clam_eflows_l, self.clam_eflows_u) #Maximisation
-        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows2) #Maximisation
-        #j_env = self.g_eflows_index2((release_d-release_i), self.eflows3) #Maximisation
-        j_fldcntrl = self.q_flood_protectn_rel((release_d-release_i), self.flood_protection) #Minimization
+        j_env = self.g_eflows_index(release_d, self.clam_eflows_l, self.clam_eflows_u) #Maximisation
+        #j_env = self.g_eflows_index2(release_d, self.eflows2) #Maximisation
+        #j_env = self.g_eflows_index2(release_d, self.eflows3) #Maximisation
+        j_fldcntrl = self.q_flood_protectn_rel(release_d, self.flood_protection) #Minimization
+        j_hyd_k = self.g_hydro_max(hydropowerProduction_Kp) # GWh/year  # Maximization of annual hydropower- Kpong
         
         #print(j_irri)
-        return j_hyd_a,  j_irri, j_env, j_fldcntrl 
+        return j_hyd_a,  j_irri, j_env, j_fldcntrl, j_hyd_k 
