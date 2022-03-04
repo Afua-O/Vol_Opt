@@ -56,8 +56,8 @@ def store_results(algorithm, track_progress, output_dir, rbf_name,
             print("Creation of the directory failed")
 
 
-    header = ["hydropower", "irrigation",
-               "environment","floodcontrol"]
+    header = ["hydropowerAk", "irrigation",
+               "environment","floodcontrol", "hydropowerKp"]
     with open(f"{output_dir}/{rbf_name}/{seed_id}_solution.csv", "w",
               encoding="UTF8", newline="") as f:
         writer = csv.writer(f)
@@ -98,10 +98,10 @@ def main():
             rbf = rbf_functions.RBF(n_rbfs, n_inputs, n_outputs, rbf_function=entry)
 
             # Initialize model
-            n_objectives = 4
-            n_years = 1
+            n_objectives = 5
+            n_years = 2
 
-            lowervolta_river = VoltaModel(241.0, 505.0, n_years, rbf)
+            lowervolta_river = VoltaModel(241.0, 305.0, n_years, rbf)
             lowervolta_river.set_log(True)
 
             # Lower and Upper Bound for problem.types
@@ -112,11 +112,13 @@ def main():
             problem.types[:] = rbf.platypus_types
             problem.function = lowervolta_river.evaluate
 
-            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower_max
+            problem.directions[0] = Problem.MAXIMIZE  # annual hydropower_max- Akosombo
             #problem.directions[0] = Problem.MINIMIZE  # annual hydropower_ deviation
             problem.directions[1] = Problem.MAXIMIZE  # irrigation
             problem.directions[2] = Problem.MAXIMIZE  # environment
+            #problem.directions[3] = Problem.MAXIMIZE  # flood events (level)
             problem.directions[3] = Problem.MINIMIZE  # flood events (flow release)
+            problem.directions[4] = Problem.MAXIMIZE  # annual hydropower_max- Kpong
 
             # algorithm = EpsNSGAII(problem, epsilons=epsilons)
             # algorithm.run(1000)
@@ -125,7 +127,7 @@ def main():
             with ProcessPoolEvaluator() as evaluator:
                 algorithm = EpsNSGAII(problem, epsilons=epsilons,
                                       evaluator=evaluator)
-                algorithm.run(200, track_progress) #trial run #should be 50000
+                algorithm.run(100, track_progress) #trial run #should be 50000
 
             store_results(algorithm, track_progress, 'output',
                           f"{entry.__name__}",
