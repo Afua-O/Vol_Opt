@@ -55,7 +55,6 @@ class VoltaModel:
         self.blevel_Ak = [] # water level at Akosombo
         self.rirri = []     # water released for irrigation
         self.renv = []      # environmental flow release
-        self.rflood = []    # flood release
         
         # historical record (1965- 2016) and 1000 year simulation horizon (using extended dataset)
         self.n_years = n_years # number of years of data
@@ -179,7 +178,7 @@ class VoltaModel:
             self.log_objectives = False
 
     def get_log(self):
-        return self.blevel_Ak, self.rirri, self.renv, self.rflood
+        return self.blevel_Ak, self.rirri, self.renv
 
         
     def apply_rbf_policy(self, rbf_input):
