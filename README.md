@@ -1,4 +1,4 @@
 # Vol_Opt
 
-Trade-off model for water management at Akosombo dam
-Based on MUSEH20 model for Sasquehana (https://github.com/JazminZatarain/MUSEH2O)
+Evolutionary Multi-Objective Direct Policy Search for the Akosombo and Kpong dams
+
